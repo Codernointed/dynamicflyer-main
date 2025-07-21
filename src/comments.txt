@@ -1,0 +1,941 @@
+I didnt like this code except the feature that can let you do adjustments to your uploaded image in the template, like how you can shrink and move the images around
+
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import Layout from "@/components/Layout";
+import { Canvas, Image, Rect, Text } from "fabric";
+import { validateImage } from "@/lib/validation";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { ArrowLeft, Download, Image as ImageIcon, Type } from "lucide-react";
+import CanvasControls from "@/components/CanvasControls";
+import CropModal from "@/components/CropModal";
+
+const Editor = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [canvas, setCanvas] = useState<Canvas | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [name, setName] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [generating, setGenerating] = useState<boolean>(false);
+  const [zoom, setZoom] = useState<number>(1);
+  const [isCropModalOpen, setIsCropModalOpen] = useState<boolean>(false);
+  const [croppedImageUrl, setCroppedImageUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+
+  // Initialize canvas and load template
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    const initCanvas = async () => {
+      setLoading(true);
+      
+      try {
+        // Create canvas with responsive dimensions
+        const fabricCanvas = new Canvas(canvasRef.current, {
+          width: 1080,
+          height: 1080,
+          backgroundColor: '#000',
+          selection: false,
+        });
+        
+        // Load flyer template image from public folder
+        const templateImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new window.Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = '/Repping.png'; // Path to the public folder
+        });
+
+        // Add template as background
+        const fabricImage = new Image(templateImg);
+        fabricImage.scaleToWidth(fabricCanvas.width || 1080);
+        fabricImage.set({
+          selectable: false,
+          evented: false,
+        });
+        
+        fabricCanvas.add(fabricImage);
+        setCanvas(fabricCanvas);
+      } catch (err) {
+        toast.error("Failed to load template");
+        console.error("Canvas initialization error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initCanvas();
+
+    return () => {
+      if (canvas) {
+        canvas.dispose();
+      }
+    };
+  }, []);
+
+  // Add/update text on canvas when name changes
+  useEffect(() => {
+    if (!canvas) return;
+    
+    // Find and remove previous text if it exists
+    const objects = canvas.getObjects();
+    const existingText = objects.find(obj => {
+      return obj instanceof Text && obj.get('nameText') === true;
+    });
+    
+    if (existingText) {
+      canvas.remove(existingText);
+    }
+    
+    if (name) {
+      // Add new text with the name
+      const text = new Text(`${name}`, {
+        left: 823,        // Centered horizontally under the image area
+        top: 905,         // Positioned below the image placeholder
+        textAlign: 'center',
+        originX: 'center',
+        fill: '#d4941c',
+        fontFamily: 'Arial',  // Changed from 'Sans-serif'
+        fontSize: 39,
+        fontWeight: 'bold',
+      });
+      
+      // Use set to add custom property
+      text.set('nameText', true);
+      
+      canvas.add(text);
+      canvas.renderAll();
+    }
+  }, [name, canvas]);
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setName(e.target.value);
+  };
+
+  const handleImageClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    const file = e.target.files[0];
+    
+    // Validate image
+    const validation = await validateImage(file);
+    if (!validation.valid) {
+      toast.error(validation.error);
+      return;
+    }
+    
+    setImageFile(file);
+    setIsCropModalOpen(true);
+  };
+
+  const handleCropComplete = async (croppedImageUrl: string) => {
+    if (!canvas) return;
+    
+    setCroppedImageUrl(croppedImageUrl);
+    
+    // Create an image object from the cropped data URL
+    const img = new window.Image();
+    img.onload = () => {
+      // Remove existing user image if any
+      const objects = canvas.getObjects();
+      const existingImage = objects.find(obj => {
+        return obj instanceof Image && obj.get('userImage') === true;
+      });
+      
+      if (existingImage) {
+        canvas.remove(existingImage);
+      }
+      
+      // Create and add new image
+      const fabricImage = new Image(img);
+      
+      // Position in the rounded rectangle area
+      fabricImage.set({
+        left: 823,       // Center of the rounded rectangle
+        top: 583,        // Center of the rounded rectangle
+        originX: 'center',
+        originY: 'center',
+        userImage: true,
+      });
+      
+      // Scale image to fill the rectangle
+      const targetHeight = 820;
+      const targetWidth = 600;
+
+      // Scale image to fit within the target dimensions
+      fabricImage.scaleToWidth(targetWidth);
+      fabricImage.scaleToHeight(targetHeight);
+      
+      // Create a rounded rectangle for clipping
+      const clipRect = new Rect({
+        width: targetWidth,
+        height: targetHeight,
+        originX: 'center',
+        originY: 'center',
+        rx: 50,    // Rounded corner radius X
+        ry: 50,    // Rounded corner radius Y
+      });
+      
+      // Apply clipping path to make the image have rounded corners
+      fabricImage.clipPath = clipRect;
+      
+      canvas.add(fabricImage);
+      canvas.bringObjectToFront(fabricImage);
+      canvas.renderAll();
+      
+      toast.success("Image added successfully");
+    };
+    
+    img.src = croppedImageUrl;
+  };
+
+  const handleZoomChange = (newZoom: number) => {
+    if (!canvas) return;
+    setZoom(newZoom);
+    
+    canvas.setZoom(newZoom);
+    canvas.renderAll();
+  };
+
+  const handleDownload = () => {
+    if (!canvas) return;
+    
+    if (!name || !imageFile) {
+      toast.error("Please add your name and image before downloading");
+      return;
+    }
+    
+    setGenerating(true);
+    
+    try {
+      // Generate dataURL
+      const dataURL = canvas.toDataURL({
+        format: 'png',
+        quality: 1,
+        multiplier: 1
+      });
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.download = `flyer-${name.replace(/\s+/g, '-').toLowerCase()}.png`;
+      link.href = dataURL;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success("Flyer downloaded successfully!");
+      
+      // Store in localStorage and navigate to success page
+      localStorage.setItem('flyerName', name);
+      localStorage.setItem('flyerImage', dataURL);
+      navigate('/success');
+    } catch (err) {
+      toast.error("Failed to download flyer");
+      console.error("Download error:", err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  return (
+    <Layout>
+      <div className="page-container py-8">
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* Canvas area */}
+          <div className="flex-1 flex flex-col items-center">
+            <h2 className="text-2xl font-bold mb-4">Flyer Editor</h2>
+            <div className="relative border border-border rounded-lg overflow-hidden shadow-lg mb-4 w-full max-w-[500px]">
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+                  <div className="w-10 h-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
+                </div>
+              )}
+              <canvas 
+                ref={canvasRef} 
+                className="w-full h-auto aspect-square"
+              />
+            </div>
+            
+            <CanvasControls 
+              zoom={zoom}
+              onZoomChange={handleZoomChange}
+              minZoom={0.5}
+              maxZoom={2}
+            />
+            
+            <div className="w-full max-w-[500px] mt-4">
+              <Button 
+                variant="default" 
+                size="lg" 
+                className="w-full"
+                onClick={handleDownload}
+                disabled={!name || !imageFile || generating}
+              >
+                {generating ? (
+                  <>
+                    <div className="w-4 h-4 mr-2 rounded-full border-2 border-background/20 border-t-background animate-spin"></div>
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download Flyer
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+          
+          {/* Controls area */}
+          <Card className="flex-1 p-6 max-w-md">
+            <h2 className="text-2xl font-bold mb-6">Customize Your Flyer</h2>
+            
+            <div className="space-y-6">
+              {/* Name input */}
+              <div>
+                <label htmlFor="name" className="block text-sm font-medium mb-2 flex items-center">
+                  <Type className="w-4 h-4 mr-2" />
+                  Your Name
+                </label>
+                <input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={handleNameChange}
+                  placeholder="Enter your name"
+                  className="w-full px-4 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Will appear as "{name} I am repping live, join me!"
+                </p>
+              </div>
+              
+              {/* Image upload */}
+              <div>
+                <label className="block text-sm font-medium mb-2 flex items-center">
+                  <ImageIcon className="w-4 h-4 mr-2" />
+                  Your Photo
+                </label>
+                
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImageUpload}
+                  accept="image/*"
+                  className="hidden"
+                />
+                
+                <div
+                  onClick={handleImageClick}
+                  className="w-full border-2 border-dashed border-border rounded-md p-4 cursor-pointer hover:bg-secondary/50 transition-colors text-center"
+                >
+                  {croppedImageUrl ? (
+                    <div className="flex flex-col items-center">
+                      <div className="w-32 h-32 rounded-full overflow-hidden mb-2 border border-border">
+                        <img
+                          src={croppedImageUrl}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <p className="text-sm">
+                        Click to change image
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="py-4">
+                      <ImageIcon className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-muted-foreground">
+                        Click to upload your photo
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        (Minimum 800x980px)
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/')}
+                  className="w-full"
+                >
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Home
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+      
+      <CropModal
+        open={isCropModalOpen}
+        onClose={() => setIsCropModalOpen(false)}
+        imageFile={imageFile}
+        onCropComplete={handleCropComplete}
+      />
+    </Layout>
+  );
+};
+
+export default Editor;
+
+The one which is nice but the image cant be edited:
+import React, { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import Layout from "@/components/Layout";
+import { Canvas, Image, Rect, Text } from "fabric";
+import { validateImage } from "@/lib/validation";
+import { motion } from "framer-motion";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { ArrowLeft, ArrowRight, Download, Image as ImageIcon, Type } from "lucide-react";
+import CanvasControls from "@/components/CanvasControls";
+import CropModal from "@/components/CropModal";
+import ProgressIndicator from "@/components/ProgressIndicator";
+
+const Editor = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [canvas, setCanvas] = useState<Canvas | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [name, setName] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(true);
+  const [generating, setGenerating] = useState<boolean>(false);
+  const [isCropModalOpen, setIsCropModalOpen] = useState<boolean>(false);
+  const [croppedImageUrl, setCroppedImageUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const [currentStep, setCurrentStep] = useState(1);
+  const [zoom, setZoom] = useState(1);
+
+  const handleZoomChange = (newZoom: number) => {
+    setZoom(newZoom);
+  };
+
+  const steps = [
+    { id: 1, label: "Details", completed: currentStep > 1, current: currentStep === 1 },
+    { id: 2, label: "Image", completed: currentStep > 2, current: currentStep === 2 },
+    { id: 3, label: "Preview", completed: false, current: currentStep === 3 },
+  ];
+
+  // Initialize canvas and load template
+  useEffect(() => {
+    if (!canvasRef.current) return;
+
+    const initCanvas = async () => {
+      setLoading(true);
+      
+      try {
+        // Create canvas with fixed dimensions
+        const fabricCanvas = new Canvas(canvasRef.current, {
+          width: 1080,
+          height: 1080,
+          backgroundColor: '#000',
+          selection: false,
+        });
+        
+        // Set canvas container size
+        canvasRef.current.style.width = '100%';
+        canvasRef.current.style.height = 'auto';
+        canvasRef.current.style.maxWidth = '400px'; // Limit preview size
+        
+        // Load flyer template image from public folder
+        const templateImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+          const img = new window.Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = '/Repping.png'; // Path to the public folder
+        });
+
+        // Add template as background with fixed dimensions
+        const fabricImage = new Image(templateImg);
+        fabricImage.scaleToWidth(1080); // Match canvas width
+        fabricImage.set({
+          selectable: false,
+          evented: false,
+          left: 0,
+          top: 0,
+        });
+        
+        fabricCanvas.add(fabricImage);
+        setCanvas(fabricCanvas);
+      } catch (err) {
+        toast.error("Failed to load template");
+        console.error("Canvas initialization error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initCanvas();
+
+    return () => {
+      if (canvas) {
+        canvas.dispose();
+      }
+    };
+  }, []);
+
+  // Add/update text on canvas when name changes
+  useEffect(() => {
+    if (!canvas) return;
+    
+    // Find and remove previous text if it exists
+    const objects = canvas.getObjects();
+    const existingText = objects.find(obj => {
+      return obj instanceof Text && obj.get('nameText') === true;
+    });
+    
+    if (existingText) {
+      canvas.remove(existingText);
+    }
+    
+    if (name) {
+      // Add new text with the name
+      const text = new Text(`${name}`, {
+        left: 823,        // Centered horizontally under the image area
+        top: 905,         // Positioned below the image placeholder
+        textAlign: 'center',
+        originX: 'center',
+        fill: '#d4941c',
+        fontFamily: 'Arial',  // Changed from 'Sans-serif'
+        fontSize: 39,
+        fontWeight: 'bold',
+      });
+      
+      // Use set to add custom property
+      text.set('nameText', true);
+      
+      canvas.add(text);
+      canvas.renderAll();
+    }
+  }, [name, canvas]);
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setName(e.target.value);
+  };
+
+  const handleImageClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    
+    const file = e.target.files[0];
+    
+    // Validate image
+    const validation = await validateImage(file);
+    if (!validation.valid) {
+      toast.error(validation.error);
+      return;
+    }
+    
+    setImageFile(file);
+    setIsCropModalOpen(true);
+  };
+
+  const handleImageManipulation = (fabricImage: Image) => {
+    if (!canvas) return;
+
+    // Configure image manipulation controls
+    fabricImage.set({
+      selectable: true,
+      hasControls: true,
+      hasBorders: true,
+      lockRotation: false,
+      cornerStyle: 'circle',
+      cornerColor: '#d4941c',
+      cornerStrokeColor: '#000',
+      transparentCorners: false,
+      padding: 5,
+      cornerSize: 12,
+      snapAngle: 45,
+      lockScalingFlip: true,
+      minScaleLimit: 0.1,
+    });
+
+    // Enable image interactivity
+    canvas.setActiveObject(fabricImage);
+
+    // Update canvas on object changes
+    canvas.on('object:modified', () => {
+      canvas.renderAll();
+    });
+
+    canvas.renderAll();
+  };
+
+  const handleCropComplete = async (croppedImageUrl: string) => {
+    if (!canvas) return;
+
+    setCroppedImageUrl(croppedImageUrl);
+
+    const img = new window.Image();
+    img.onload = () => {
+      try {
+        // Remove existing user image if any
+        const objects = canvas.getObjects();
+        const existingImage = objects.find(
+          (obj) => obj instanceof Image && obj.get('userImage') === true
+        );
+
+        if (existingImage) {
+          canvas.remove(existingImage);
+        }
+
+        // Create new image
+        const fabricImage = new Image(img);
+
+        // Position in the center of the canvas
+        fabricImage.set({
+          left: canvas.width! / 2,
+          top: canvas.height! / 2,
+          originX: 'center',
+          originY: 'center',
+          userImage: true,
+        });
+
+        // Scale image to fit within the canvas
+        const targetHeight = canvas.height! * 0.8;
+        const targetWidth = canvas.width! * 0.8;
+
+        // Calculate scale to fit
+        const scaleX = targetWidth / img.width;
+        const scaleY = targetHeight / img.height;
+        const scale = Math.min(scaleX, scaleY);
+
+        fabricImage.scale(scale);
+
+        // Add the image to the canvas
+        canvas.add(fabricImage);
+
+        // Bring the uploaded image to the front
+        canvas.setActiveObject(fabricImage);
+        canvas.renderAll();
+
+        // Make image interactive
+        handleImageManipulation(fabricImage);
+
+        toast.success(
+          "Image added successfully. You can now adjust your image position and size."
+        );
+      } catch (err) {
+        toast.error("Failed to add image");
+        console.error(err);
+      }
+    };
+
+    img.src = croppedImageUrl;
+  };
+
+  const handleDownload = () => {
+    if (!canvas) return;
+    
+    if (!name || !imageFile) {
+      toast.error("Please add your name and image before downloading");
+      return;
+    }
+    
+    setGenerating(true);
+    
+    try {
+      // Generate dataURL
+      const dataURL = canvas.toDataURL({
+        format: 'png',
+        quality: 1,
+        multiplier: 1
+      });
+      
+      // Create download link
+      const link = document.createElement('a');
+      link.download = `flyer-${name.replace(/\s+/g, '-').toLowerCase()}.png`;
+      link.href = dataURL;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      toast.success("Flyer downloaded successfully!");
+      
+      // Store in localStorage and navigate to success page
+      localStorage.setItem('flyerName', name);
+      localStorage.setItem('flyerImage', dataURL);
+      navigate('/success');
+    } catch (err) {
+      toast.error("Failed to download flyer");
+      console.error("Download error:", err);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleNext = async () => {
+    if (currentStep === 1) {
+      if (!name.trim()) {
+        toast.error("Please enter your name");
+        return;
+      }
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      if (!imageFile) {
+        toast.error("Please upload and adjust your image");
+        return;
+      }
+      setCurrentStep(3);
+    } else if (currentStep === 3) {
+      handleDownload();
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  return (
+    <Layout>
+      <div className="page-container py-8">
+        <h1 className="text-3xl font-bold text-center mb-8">Create Your Flyer</h1>
+        
+        <ProgressIndicator steps={steps} />
+        
+        <div className="grid md:grid-cols-2 gap-10 mt-8">
+          {/* Left Column - Edit Area */}
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5 }}
+            className="space-y-8"
+          >
+            {currentStep === 1 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-6"
+              >
+                <Card className="p-6">
+                  <h2 className="text-xl font-semibold mb-4">Enter Your Details</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="name" className="block text-sm font-medium mb-2 flex items-center">
+                        <Type className="w-4 h-4 mr-2" />
+                        Your Name
+                      </label>
+                      <input
+                        id="name"
+                        type="text"
+                        value={name}
+                        onChange={handleNameChange}
+                        placeholder="Enter your name"
+                        className="w-full px-4 py-2 border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary/20"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Will appear as "{name} I am repping live, join me!"
+                      </p>
+                    </div>
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+            
+            {currentStep === 2 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-6"
+              >
+                <Card className="p-6">
+                  <h2 className="text-xl font-semibold mb-4">Upload & Adjust Image</h2>
+                  <div className="space-y-4">
+                    <div
+                      onClick={handleImageClick}
+                      className="w-full border-2 border-dashed border-border rounded-md p-4 cursor-pointer hover:bg-secondary/50 transition-colors text-center"
+                    >
+                      {croppedImageUrl ? (
+                        <div className="flex flex-col items-center">
+                          <div className="w-32 h-32 rounded-full overflow-hidden mb-2 border border-border">
+                            <img
+                              src={croppedImageUrl}
+                              alt="Preview"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <p className="text-sm">Click to change image</p>
+                        </div>
+                      ) : (
+                        <div className="py-4">
+                          <ImageIcon className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
+                          <p className="text-muted-foreground">
+                            Click to upload your photo
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleImageUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    
+                    {croppedImageUrl && (
+                      <div className="flex justify-center">
+                        <CanvasControls 
+                          zoom={zoom}
+                          onZoomChange={handleZoomChange}
+                          minZoom={0.5}
+                          maxZoom={2}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+            
+            {currentStep === 3 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.3 }}
+                className="space-y-6"
+              >
+                <Card className="p-6">
+                  <h2 className="text-xl font-semibold mb-4">Review & Download</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-sm font-medium text-muted-foreground mb-2">Preview your flyer</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Check how your flyer looks before downloading.
+                      </p>
+                    </div>
+                    
+                    <Button
+                      variant="default"
+                      size="lg"
+                      className="w-full"
+                      onClick={handleDownload}
+                      disabled={!name || !imageFile || generating}
+                    >
+                      {generating ? (
+                        <>
+                          <div className="w-4 h-4 mr-2 rounded-full border-2 border-background/20 border-t-background animate-spin"></div>
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <Download className="mr-2 h-4 w-4" />
+                          Download Flyer
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </Card>
+              </motion.div>
+            )}
+            
+            <div className="flex justify-between pt-4">
+              <Button
+                variant="outline"
+                onClick={handleBack}
+                disabled={currentStep === 1}
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back
+              </Button>
+              
+              <Button
+                onClick={handleNext}
+                disabled={generating}
+              >
+                {currentStep === 3 ? (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Download
+                  </>
+                ) : (
+                  <>
+                    Continue
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            </div>
+          </motion.div>
+
+          {/* Right Column - Preview Area */}
+          <motion.div
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="flex flex-col items-center md:items-start"
+          >
+            <div className="w-full max-w-[400px] mx-auto md:sticky md:top-8">
+              <h2 className="text-xl font-semibold mb-6">Live Preview</h2>
+              <div className="relative border border-border rounded-lg overflow-hidden shadow-lg bg-black">
+                {loading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/80 z-10">
+                    <div className="w-10 h-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin"></div>
+                  </div>
+                )}
+                <div className="relative w-full" style={{ paddingTop: '100%' }}>
+                  <div className="absolute inset-0">
+                    <canvas 
+                      ref={canvasRef} 
+                      className="w-full h-full"
+                    />
+                  </div>
+                </div>
+              </div>
+              {imageFile && (
+                <div className="mt-4 p-4 bg-secondary/10 rounded-lg space-y-2">
+                  <p className="text-sm text-muted-foreground text-center">
+                    ✨ Customize your image:
+                  </p>
+                  <ul className="text-xs text-muted-foreground space-y-1">
+                    <li>• Drag to reposition</li>
+                    <li>• Use corners to resize</li>
+                    <li>• Top handle to rotate</li>
+                  </ul>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      </div>
+      
+      <CropModal
+        open={isCropModalOpen}
+        onClose={() => setIsCropModalOpen(false)}
+        imageFile={imageFile}
+        onCropComplete={handleCropComplete}
+      />
+    </Layout>
+  );
+};
+
+export default Editor;
+

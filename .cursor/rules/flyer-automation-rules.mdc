@@ -1,0 +1,148 @@
+---
+description: an overall guide
+alwaysApply: false
+---
+Create a UI/UX design for an application that exemplifies the highest standards of design excellence. The design should be visually captivating, with a modern and elegant aesthetic that avoids any bland or generic elements. Ensure that the layout is intuitive and user-friendly, with a clear visual hierarchy that guides the user's attention seamlessly. Use a cohesive color scheme and typography that not only look beautiful but also enhance the functionality of the application. The final design should be a perfect blend of form and function, providing an exceptional and memorable user experience.
+Of course. This is an exceptional vision, and it requires an exceptionally detailed prompt to guide the AI in architecting and building a truly professional, premium platform. This prompt is designed to be fed to a sophisticated AI code architect (like GPT-4, Claude 3 Opus, etc.). It leaves no room for ambiguity and sets a world-class standard.
+
+---
+
+### **Comprehensive Development Prompt for AI Code Architect: Evolving a Flyer Generator into a Premium, Multi-Tenant SaaS Platform**
+
+#### **Project Title: "Dynamic Flyer Platform - Version 2.0"**
+
+---
+
+### **1.0 Executive Summary & Vision**
+
+**Our Mission:** To evolve a successful , error free, single-purpose flyer generator into a best-in-class, multi-tenant SaaS platform. This new platform will empower designers, marketers, and event hosts ("Creators") to upload their own static flyer designs, define dynamic "smart zones" for images and text, and share a simple public link for end-users to generate their own personalized versions effortlessly.
+
+**The Starting Point (Version 1.0):** We have already successfully developed and deployed a v1 of this application. It is a client-side-only React/Vite application using Fabric.js for canvas manipulation. It allows users to generate a flyer for a *single, hardcoded campaign*. The codebase demonstrates proficiency with React, TypeScript, Fabric.js, and modern UI libraries (shadcn/ui, Tailwind CSS).
+
+**The Quantum Leap (Version 2.0):** This is not an incremental update. This is a complete architectural overhaul. We are introducing a full backend, user authentication, a database, and a dynamic templating system. Your primary task is to architect and generate the codebase for this new, robust, and scalable platform, leveraging the best of our existing tech stack while building a sophisticated backend and a dual-user-experience frontend. The final product must be perceived as premium, intuitive, and highly reliable.
+
+---
+
+### **2.0 Product Requirements Document (PRD)**
+
+#### **2.1 Target Audience (Personas)**
+
+1.  **The Creator (Host/Designer):**
+    *   **Who:** Graphic designers, event organizers, marketing managers, community leaders.
+    *   **Goal:** To create beautiful, on-brand flyer templates and easily distribute them for mass personalization without losing design control.
+    *   **Pain Point:** Manually creating dozens of personalized flyers is tedious. Existing tools are either too complex (Photoshop) or too generic and off-brand (basic social media editors).
+
+2.  **The End-User (The Public):**
+    *   **Who:** Employees, students, event attendees, community members.
+    *   **Goal:** To quickly create a personalized, professional-looking flyer with their name and photo in just a few clicks.
+    *   **Pain Point:** They are not designers and need a foolproof way to generate a flyer that looks good every time.
+
+#### **2.2 Core Feature Set & User Stories**
+
+**Module: User Authentication & Management**
+*   **Story:** As a Creator, I want to sign up for an account using my email and password so that I can securely store and manage my templates.
+*   **Story:** As a Creator, I want to log in and out of my account.
+*   **Story:** As a Creator, I want to be able to reset my password if I forget it.
+
+**Module: Creator Dashboard**
+*   **Story:** As a Creator, upon logging in, I want to see a dashboard that displays all the templates I have created.
+*   **Story:** As a Creator, I want a clear "Create New Template" button to start the template creation process.
+*   **Story:** As a Creator, I want each template on my dashboard to show a thumbnail preview, a name, and options to "Edit," "Get Share Link," and "Delete."
+
+**Module: The Template Editor (The Core of the Platform)**
+*   **Story:** As a Creator, I want to upload my flyer design as a high-resolution PNG or JPG to use as a static background.
+*   **Story:** As a Creator, once my background is uploaded, I want to use a canvas-based editor to define dynamic areas on top of it.
+*   **Story:** As a Creator, I want to be able to draw a resizable and draggable rectangle to define an **"Image Frame,"** where end-users will upload their photo.
+*   **Story:** As a Creator, I want to be able to draw another resizable and draggable rectangle to define a **"Text Frame,"** where end-users will input their name.
+*   **Story:** As a Creator, for each Text Frame, I want to be able to set default properties like font size, font family (from a curated list), and color.
+*   **Story:** As a Creator, I want to be able to name my template and save it. The system must persist the background image URL and the precise coordinates, dimensions, and properties of all frames I've defined.
+
+**Module: Public Flyer Generator**
+*   **Story:** As a Creator, I want to get a unique, shareable link for each saved template.
+*   **Story:** As an End-User, when I visit this shareable link, I want to see the beautiful flyer template.
+*   **Story:** As an End-User, I want to see a simple form with an "Upload Photo" field and an "Enter Name" field, corresponding to the frames the Creator defined.
+*   **Story:** As an End-User, when I upload my photo, I want it to automatically appear inside the designated Image Frame, perfectly cropped and centered.
+*   **Story:** As an End-User, I want my interactions to be completely locked down; I cannot move, resize, or edit anything outside of the designated input fields.
+*   **Story:** As an End-User, once I'm happy with my personalized flyer, I want to click a "Download" button to get a high-quality PNG of the final result.
+
+---
+
+### **3.0 Software Requirements Specification (SRS)**
+
+#### **3.1 Functional Requirements**
+
+*   **User System:**
+    *   Secure user registration (email/password).
+    *   JWT-based session management.
+    *   Protected routes for the dashboard and editor.
+*   **Database & Storage (Supabase):**
+    *   **Schema:** Define SQL schemas for `profiles` and `templates`. The `templates` table must store `user_id`, `background_url`, and a `jsonb` column for `frames`.
+    *   **Row Level Security (RLS):** Implement strict RLS. Users can only C/R/U/D their own templates. Public read access must be carefully managed.
+    *   **Storage:** Use Supabase Storage for template backgrounds and user-uploaded images, with appropriate bucket policies.
+*   **Template Editor Canvas (Fabric.js):**
+    *   Load background image from URL.
+    *   Tooling to add `fabric.Rect` objects. Each object must have a custom property, e.g., `meta: { type: 'image' }`.
+    *   Objects must be selectable, resizable, and draggable by the Creator.
+    *   Implement snapping guides (to edges and other objects) for precise alignment.
+    *   A simple properties panel to edit frame details (e.g., text color).
+    *   On save, serialize canvas frame data (x, y, width, height, type, text properties) into a JSON array and persist to the database.
+*   **Public Generator Canvas (Fabric.js):**
+    *   Fetch template data (background URL, frames array) from the database via API.
+    *   Render the background.
+    *   For each object in the `frames` array, render a non-interactive placeholder.
+    *   Image Upload: Use `react-easy-crop` (from v1) or a similar library to handle user image uploads, but constrain the crop to the aspect ratio of the target Image Frame. The cropped image should be used as a fill pattern for the `fabric.Rect` of the image frame.
+    *   Text Input: Dynamically update the `content` of the `fabric.Text` object within the Text Frame.
+    *   Export: The canvas export function must produce a high-resolution PNG, ignoring any helper UI elements.
+
+#### **3.2 Non-Functional Requirements**
+
+*   **Performance:** The platform must be fast. Template editor canvas must be responsive and handle large images without lag. Public generator page must load in under 2 seconds.
+*   **Security:** All user data must be protected via Supabase RLS. All user inputs must be sanitized.
+*   **Usability (UX):** The user flows for both Creator and End-User must be exceptionally intuitive. Minimal clicks, clear instructions, and instant visual feedback are paramount. The Creator's editor should feel powerful but not overwhelming.
+*   **Maintainability:** The codebase must be highly modular, well-documented with TSDoc, and follow best practices for React and TypeScript development.
+*   **Reliability:** The application should handle errors gracefully (e.g., failed image uploads, API errors) and provide clear feedback to the user. 99.9% uptime is the target.
+*   **Scalability:** The architecture must be designed to handle a growing number of users and templates without performance degradation. Supabase is chosen for this reason.
+
+---
+
+### **4.0 UI/UX Principles & Elevating Features**
+
+**Design Philosophy:** Minimalist, clean, and professional. The UI should get out of the way and let the user's content shine. Draw inspiration from the clean interfaces of Canva, Pitch.com, and Linear .
+
+**UI Stack:**
+*   **Framework:** React 18+ with TypeScript and Vite.
+*   **Styling:** Tailwind CSS.
+*   **Component Library:** **shadcn/ui**. We will continue to use this for its excellent composition and accessibility.
+*   **Animations:** **Framer Motion** for subtle, delightful micro-interactions (page transitions, modal pop-ups, button feedback).
+
+**Elevating Features (To make this truly best-in-class):**
+
+1.  **Magic Image Fit:** When an end-user uploads a photo, don't just place it. Analyze its focal point (e.g., detect a face) and intelligently center the crop within the Image Frame to produce the best possible result automatically.
+2.  **QR Code Generator:** On the Creator's dashboard, next to the "Get Share Link" button, add a "Get QR Code" button that instantly generates a downloadable QR code pointing to the public flyer link.
+3.  **Template Analytics:** A simple view for Creators showing how many times their public link has been visited and how many flyers have been generated from it.
+4.  **Custom Font Upload:** (v2.1 feature) Allow Creators to upload their own `.woff2` font files to use in their Text Frames, ensuring perfect brand consistency.
+5.  **PDF Export Option:** In addition to PNG, allow End-Users to download the final flyer as a high-quality PDF.
+
+---
+
+### **5.0 Your Task as AI Code Architect**
+
+Act as the Lead Software Architect and Senior Full-Stack Developer on this project. Your task is to provide a complete, file-by-file implementation plan and generate the foundational code for this v2.0 platform.
+
+**Execution Order:**
+
+1.  **Database Schema:** Provide the complete SQL code for setting up the `profiles` and `templates` tables in Supabase, including RLS policies and the `handle_new_user` trigger.
+2.  **Authentication Flow:** Generate the React components and hooks for user sign-up, login, and session management using `@supabase/auth-helpers-react`.
+3.  **Core Application Layout:** Create the main layout component that includes a sidebar for dashboard navigation and handles protected routes.
+4.  **Dashboard Components:**
+    *   Generate the code for the `/dashboard` page, including the logic to fetch and display a grid of `TemplateCard` components.
+    *   Generate the `TemplateCard` component.
+5.  **The Template Editor (`/dashboard/edit/[templateId]`):**
+    *   This is the most critical part. Generate the full React component for the editor.
+    *   It must include the Fabric.js canvas setup, the logic for adding and manipulating frames, and the API calls to save the template data (background URL and frames JSON) to Supabase.
+6.  **The Public Generator (`/flyer/[templateId]`):**
+    *   Generate the full component for this public page.
+    *   It must fetch the template data based on the URL parameter, render the locked-down canvas, handle the user's image and text input, and provide the download functionality.
+7.  **API/Library file (`/lib/supabase.ts`):** Create a centralized file for all Supabase client interactions (e.g., `getTemplateById`, `updateTemplateFrames`, `uploadImage`).
+
+Provide the code in a structured, file-by-file format, including clear comments explaining the architecture, the purpose of key functions, and any complex logic. Create a plan.md to always record your journal, what youve done, a checklist, erros encountered, fixed, to do, etc
