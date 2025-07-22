@@ -51,6 +51,7 @@ interface UserData {
   [frameId: string]: {
     type: 'image' | 'text';
     value: string | File;
+    uploadedUrl?: string; // Cached upload URL
   };
 }
 
@@ -143,7 +144,7 @@ export default function PublicGenerator() {
 
     console.log('Canvas initialized, calling renderCanvas...');
     renderCanvas();
-  }, []);
+  }, [renderCanvas]);
 
   // Initialize canvas on mount
   useEffect(() => {
@@ -231,7 +232,9 @@ export default function PublicGenerator() {
             resolve();
           };
           userImage.onerror = reject;
-          userImage.src = userInput.value as string;
+          // Use cached URL if available, otherwise use the value directly
+          const imageSrc = userInput.uploadedUrl || userInput.value;
+          userImage.src = typeof imageSrc === 'string' ? imageSrc : URL.createObjectURL(imageSrc as File);
         });
 
       } else if (frame.type === 'text' && userInput.type === 'text') {
@@ -281,23 +284,26 @@ export default function PublicGenerator() {
     }
   }, [userData, renderCanvas, template, backgroundUrl]);
 
-  // Handle file upload
+  // Handle file upload with caching
   const handleFileUpload = async (frameId: string, file: File) => {
     try {
-      const imageUrl = await uploadImage(file, 'user-uploads');
+      // Create a local preview URL immediately
+      const previewUrl = URL.createObjectURL(file);
       
+      // Update UI immediately with preview
       setUserData(prev => ({
         ...prev,
         [frameId]: {
           type: 'image',
-          value: imageUrl
+          value: file,
+          uploadedUrl: previewUrl
         }
       }));
 
-      toast.success('Image uploaded successfully!');
+      toast.success('Image added successfully! (Will upload when you save/download)');
     } catch (error) {
-      console.error('Error uploading image:', error);
-      toast.error('Failed to upload image');
+      console.error('Error handling image:', error);
+      toast.error('Failed to add image');
     }
   };
 
@@ -318,6 +324,25 @@ export default function PublicGenerator() {
 
     setGenerating(true);
     try {
+      // Upload any cached images first
+      const updatedUserData = { ...userData };
+      
+      for (const [frameId, userInput] of Object.entries(userData)) {
+        if (userInput.type === 'image' && userInput.value instanceof File && !userInput.uploadedUrl?.startsWith('http')) {
+          try {
+            console.log('Uploading cached image for frame:', frameId);
+            const imageUrl = await uploadImage(userInput.value, 'user-uploads');
+            updatedUserData[frameId] = {
+              ...userInput,
+              uploadedUrl: imageUrl
+            };
+          } catch (error) {
+            console.error('Failed to upload image for frame:', frameId, error);
+            toast.error('Failed to upload some images');
+          }
+        }
+      }
+
       // Re-render canvas to ensure latest data
       await renderCanvas();
 
@@ -369,6 +394,25 @@ export default function PublicGenerator() {
 
     setGenerating(true);
     try {
+      // Upload any cached images first
+      const updatedUserData = { ...userData };
+      
+      for (const [frameId, userInput] of Object.entries(userData)) {
+        if (userInput.type === 'image' && userInput.value instanceof File && !userInput.uploadedUrl?.startsWith('http')) {
+          try {
+            console.log('Uploading cached image for frame:', frameId);
+            const imageUrl = await uploadImage(userInput.value, 'user-uploads');
+            updatedUserData[frameId] = {
+              ...userInput,
+              uploadedUrl: imageUrl
+            };
+          } catch (error) {
+            console.error('Failed to upload image for frame:', frameId, error);
+            toast.error('Failed to upload some images');
+          }
+        }
+      }
+
       // Re-render canvas to ensure latest data
       await renderCanvas();
 
@@ -380,7 +424,7 @@ export default function PublicGenerator() {
       // Create a personalized template record
       const personalizedData = {
         original_template_id: template.id,
-        user_data: userData,
+        user_data: updatedUserData,
         generated_image_url: dataURL,
         created_at: new Date().toISOString()
       };

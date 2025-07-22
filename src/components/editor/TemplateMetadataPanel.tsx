@@ -3,7 +3,7 @@
  * Panel for setting template name, type, description, and background image
  */
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload, Image as ImageIcon, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -53,6 +53,7 @@ export default function TemplateMetadataPanel({
   onBackgroundChange,
 }: TemplateMetadataPanelProps) {
   const [uploading, setUploading] = useState(false);
+  const [uploadKey, setUploadKey] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -92,6 +93,11 @@ export default function TemplateMetadataPanel({
       onBackgroundChange(imageUrl);
       console.log('🔄 Background URL updated in parent component');
       
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      
       toast.dismiss(uploadToast);
       toast.success('Background image uploaded successfully!');
     } catch (error: any) {
@@ -121,7 +127,18 @@ export default function TemplateMetadataPanel({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
+    // Force a re-render to ensure the upload area is shown
+    setUploadKey(prev => prev + 1);
   };
+
+  // Cleanup file input on unmount
+  useEffect(() => {
+    return () => {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    };
+  }, []);
 
 
 
@@ -179,7 +196,7 @@ export default function TemplateMetadataPanel({
         </CardHeader>
         <CardContent>
           {!backgroundUrl ? (
-            <div className="space-y-4">
+            <div className="space-y-4" key={`upload-area-${uploadKey}`}>
               <div 
                 className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-gray-400 transition-colors cursor-pointer"
                 onClick={() => fileInputRef.current?.click()}
@@ -199,6 +216,7 @@ export default function TemplateMetadataPanel({
 
               <input
                 ref={fileInputRef}
+                key={`file-input-${uploadKey}`}
                 type="file"
                 accept="image/*"
                 onChange={handleFileUpload}
@@ -238,6 +256,7 @@ export default function TemplateMetadataPanel({
 
               <input
                 ref={fileInputRef}
+                key={`file-input-replace-${uploadKey}`}
                 type="file"
                 accept="image/*"
                 onChange={handleFileUpload}
