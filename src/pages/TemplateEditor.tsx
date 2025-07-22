@@ -112,6 +112,7 @@ export default function TemplateEditor() {
     setSaving(true);
     try {
       const templateData = {
+        user_id: user.id,
         name: templateName.trim(),
         template_type: templateType,
         description: templateDescription.trim(),

@@ -71,6 +71,9 @@ export default function QRCodeGenerator({ url, templateName }: QRCodeGeneratorPr
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>QR Code for Sharing</DialogTitle>
+          <p className="text-sm text-gray-600">
+            Generate a QR code that others can scan to access your template
+          </p>
         </DialogHeader>
         <div className="space-y-4">
           <Card>

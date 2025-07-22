@@ -27,7 +27,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { getTemplate } from '@/lib/supabase';
+import { getPublicTemplate } from '@/lib/supabase';
 import { Template } from '@/integrations/supabase/types';
 import { uploadImage } from '@/lib/supabase';
 
@@ -88,7 +88,10 @@ export default function PublicGenerator() {
     const loadTemplate = async () => {
       try {
         setLoading(true);
-        const templateData = await getTemplate(templateId);
+        console.log('Loading template with ID:', templateId);
+        
+        const templateData = await getPublicTemplate(templateId);
+        console.log('Template data received:', templateData);
         
         if (!templateData) {
           setError('Template not found');
@@ -100,6 +103,7 @@ export default function PublicGenerator() {
         
         if (templateData.frames && Array.isArray(templateData.frames)) {
           setFrames(templateData.frames as FrameData[]);
+          console.log('Frames loaded:', templateData.frames);
         }
 
         // Generate share link
@@ -121,9 +125,14 @@ export default function PublicGenerator() {
   const initializeCanvas = useCallback(() => {
     if (!canvasRef.current) return;
 
+    console.log('Initializing canvas...');
+    
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {
+      console.error('Failed to get canvas context');
+      return;
+    }
 
     // Set canvas size
     const width = 800;
@@ -132,6 +141,7 @@ export default function PublicGenerator() {
     canvas.width = width;
     canvas.height = height;
 
+    console.log('Canvas initialized, calling renderCanvas...');
     renderCanvas();
   }, []);
 
@@ -144,9 +154,14 @@ export default function PublicGenerator() {
 
   // Render canvas with user data
   const renderCanvas = useCallback(async () => {
+    console.log('renderCanvas called with:', { backgroundUrl, framesCount: frames.length, userDataCount: Object.keys(userData).length });
+    
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx || !backgroundUrl) return;
+    if (!canvas || !ctx || !backgroundUrl) {
+      console.log('renderCanvas early return:', { hasCanvas: !!canvas, hasCtx: !!ctx, hasBackgroundUrl: !!backgroundUrl });
+      return;
+    }
 
     // Clear canvas
     ctx.fillStyle = '#ffffff';
