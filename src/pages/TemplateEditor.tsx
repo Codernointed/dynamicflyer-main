@@ -30,6 +30,7 @@ import TemplateMetadataPanel from '@/components/editor/TemplateMetadataPanel';
 import FrameToolbar from '@/components/editor/FrameToolbar';
 import PropertiesPanel from '@/components/editor/PropertiesPanel';
 import { toast } from 'sonner';
+import QRCodeGenerator from '@/components/shared/QRCodeGenerator';
 
 interface FrameData {
   id: string;
@@ -154,7 +155,7 @@ export default function TemplateEditor() {
       return;
     }
 
-    const shareUrl = `${window.location.origin}/generate/${template.id}`;
+    const shareUrl = `${window.location.origin}/flyer/${template.id}`;
     try {
       await navigator.clipboard.writeText(shareUrl);
       toast.success('Share link copied to clipboard!');
@@ -202,6 +203,11 @@ export default function TemplateEditor() {
               <Eye className="mr-2 h-4 w-4" />
               Preview
             </Button>
+            
+            <QRCodeGenerator 
+              url={`${window.location.origin}/flyer/${template?.id}`}
+              templateName={templateName}
+            />
             
             <Button
               variant="outline" 
