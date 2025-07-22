@@ -18,7 +18,8 @@ import {
   Check,
   QrCode,
   Save,
-  RefreshCw
+  RefreshCw,
+  FileText
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,6 +31,7 @@ import { toast } from 'sonner';
 import { getPublicTemplate } from '@/lib/supabase';
 import { Template } from '@/integrations/supabase/types';
 import { uploadImage } from '@/lib/supabase';
+import { exportCanvasToPDF, getPDFExportOptions } from '@/lib/pdfUtils';
 
 interface FrameData {
   id: string;
@@ -363,6 +365,55 @@ export default function PublicGenerator() {
     }
   };
 
+  // Export to PDF
+  const handleExportPDF = async () => {
+    if (!canvasRef.current) return;
+
+    setGenerating(true);
+    try {
+      // Upload any cached images first
+      const updatedUserData = { ...userData };
+      
+      for (const [frameId, userInput] of Object.entries(userData)) {
+        if (userInput.type === 'image' && userInput.value instanceof File && !userInput.uploadedUrl?.startsWith('http')) {
+          try {
+            console.log('Uploading cached image for frame:', frameId);
+            const imageUrl = await uploadImage(userInput.value, 'user-uploads');
+            updatedUserData[frameId] = {
+              ...userInput,
+              uploadedUrl: imageUrl
+            };
+          } catch (error) {
+            console.error('Failed to upload image for frame:', frameId, error);
+            toast.error('Failed to upload some images');
+          }
+        }
+      }
+
+      // Re-render canvas to ensure latest data
+      await renderCanvas();
+
+      const canvas = canvasRef.current;
+      const filename = `${template?.name || 'flyer'}-personalized.pdf`;
+      
+      await exportCanvasToPDF(canvas, {
+        width: canvas.width,
+        height: canvas.height,
+        quality: 1.0,
+        format: 'A4',
+        orientation: 'portrait',
+        filename
+      });
+
+      toast.success('PDF exported successfully!');
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast.error('Failed to export PDF');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   // Copy share link
   const handleCopyLink = async () => {
     try {
@@ -689,7 +740,17 @@ export default function PublicGenerator() {
                   disabled={generating}
                 >
                   <Download className="mr-2 h-4 w-4" />
-                  {generating ? 'Generating...' : 'Download'}
+                  {generating ? 'Generating...' : 'PNG'}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleExportPDF}
+                  disabled={generating}
+                >
+                  <FileText className="mr-2 h-4 w-4" />
+                  {generating ? 'Generating...' : 'PDF'}
                 </Button>
               </div>
             </div>
@@ -735,7 +796,7 @@ export default function PublicGenerator() {
             {/* Help Text */}
             <div className="mt-4 text-xs text-gray-500 text-center space-y-1">
               <p>Fill in your information on the left to personalize your template</p>
-              <p>Click Download to save your personalized version</p>
+              <p>Click PNG or PDF to download your personalized version</p>
             </div>
           </div>
         </div>

@@ -21,6 +21,7 @@ import SignUpPage from "./pages/auth/SignUpPage";
 import Dashboard from "./pages/Dashboard";
 import TemplateEditor from "./pages/TemplateEditor";
 import PublicGenerator from "./pages/PublicGenerator";
+import Analytics from "./pages/Analytics";
 
 // Dashboard Layout
 import DashboardLayout from "./components/dashboard/DashboardLayout";
@@ -137,7 +138,7 @@ const App = () => {
               >
                 <Route index element={<Dashboard />} />
                 <Route path="editor/:templateId" element={<TemplateEditor />} />
-                <Route path="analytics" element={<div>Analytics Page Coming Soon</div>} />
+                <Route path="analytics" element={<Analytics />} />
               </Route>
 
               {/* Public Flyer Generator */}
