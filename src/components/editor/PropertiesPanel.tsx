@@ -3,8 +3,9 @@
  * Panel for customizing selected frame properties (text styling, alignment, etc.)
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Palette, Type, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { getAvailableFonts } from '@/lib/fontUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -41,31 +42,32 @@ interface PropertiesPanelProps {
   onFrameUpdate: (frame: FrameData) => void;
 }
 
-const fontFamilies = [
-  { value: 'Arial', label: 'Arial' },
-  { value: 'Helvetica', label: 'Helvetica' },
-  { value: 'Times New Roman', label: 'Times New Roman' },
-  { value: 'Georgia', label: 'Georgia' },
-  { value: 'Verdana', label: 'Verdana' },
-  { value: 'Trebuchet MS', label: 'Trebuchet MS' },
-  { value: 'Impact', label: 'Impact' },
-  { value: 'Comic Sans MS', label: 'Comic Sans MS' },
-];
-
-const textAlignOptions = [
-  { value: 'left', label: 'Left', icon: AlignLeft },
-  { value: 'center', label: 'Center', icon: AlignCenter },
-  { value: 'right', label: 'Right', icon: AlignRight },
-];
-
-const presetColors = [
-  '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF',
-  '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080',
-  '#FFC0CB', '#A52A2A', '#808080', '#000080', '#008000',
-];
-
 export default function PropertiesPanel({ frame, onFrameUpdate }: PropertiesPanelProps) {
   const [customColor, setCustomColor] = useState(frame.properties?.color || '#000000');
+  const [availableFonts, setAvailableFonts] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Load available fonts (system + custom)
+    const fonts = getAvailableFonts();
+    setAvailableFonts(fonts);
+  }, []);
+
+  const fontFamilies = availableFonts.map(font => ({
+    value: font,
+    label: font
+  }));
+
+  const textAlignOptions = [
+    { value: 'left', label: 'Left', icon: AlignLeft },
+    { value: 'center', label: 'Center', icon: AlignCenter },
+    { value: 'right', label: 'Right', icon: AlignRight },
+  ];
+
+  const presetColors = [
+    '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF',
+    '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080',
+    '#FFC0CB', '#A52A2A', '#808080', '#000080', '#008000',
+  ];
 
   const updateFrameProperty = (property: string, value: any) => {
     const updatedFrame = {
@@ -157,209 +159,192 @@ export default function PropertiesPanel({ frame, onFrameUpdate }: PropertiesPane
           </CardHeader>
           <CardContent className="text-xs text-gray-600 space-y-1">
             <p>• Users will upload images to this frame</p>
-            <p>• Images will be cropped to fit the frame size</p>
-            <p>• Consider the aspect ratio for best results</p>
-            <p>• Square frames work well for profile photos</p>
+            <p>• Images will be automatically cropped to fit</p>
+            <p>• Recommended aspect ratio: {Math.round(frame.width / frame.height * 100) / 100}</p>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  // Text frame properties
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium flex items-center">
-            <Type className="mr-2 h-4 w-4 text-red-600" />
-            Text Frame Properties
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Position */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="text-x">X Position</Label>
-              <Input
-                id="text-x"
-                type="number"
-                value={frame.x}
-                onChange={(e) => updateFramePosition('x', parseInt(e.target.value) || 0)}
-              />
+  if (frame.type === 'text') {
+    return (
+      <div className="space-y-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium flex items-center">
+              <Type className="mr-2 h-4 w-4 text-green-600" />
+              Text Frame Properties
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Position */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="text-x">X Position</Label>
+                <Input
+                  id="text-x"
+                  type="number"
+                  value={frame.x}
+                  onChange={(e) => updateFramePosition('x', parseInt(e.target.value) || 0)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="text-y">Y Position</Label>
+                <Input
+                  id="text-y"
+                  type="number"
+                  value={frame.y}
+                  onChange={(e) => updateFramePosition('y', parseInt(e.target.value) || 0)}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="text-y">Y Position</Label>
-              <Input
-                id="text-y"
-                type="number"
-                value={frame.y}
-                onChange={(e) => updateFramePosition('y', parseInt(e.target.value) || 0)}
-              />
-            </div>
-          </div>
 
-          {/* Dimensions */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label htmlFor="text-width">Width</Label>
-              <Input
-                id="text-width"
-                type="number"
-                value={frame.width}
-                onChange={(e) => updateFrameDimensions('width', parseInt(e.target.value) || 10)}
-              />
+            {/* Dimensions */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2">
+                <Label htmlFor="text-width">Width</Label>
+                <Input
+                  id="text-width"
+                  type="number"
+                  value={frame.width}
+                  onChange={(e) => updateFrameDimensions('width', parseInt(e.target.value) || 10)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="text-height">Height</Label>
+                <Input
+                  id="text-height"
+                  type="number"
+                  value={frame.height}
+                  onChange={(e) => updateFrameDimensions('height', parseInt(e.target.value) || 10)}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="text-height">Height</Label>
-              <Input
-                id="text-height"
-                type="number"
-                value={frame.height}
-                onChange={(e) => updateFrameDimensions('height', parseInt(e.target.value) || 10)}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Typography */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Typography</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Font Family */}
-          <div className="space-y-2">
-            <Label>Font Family</Label>
-            <Select
-              value={frame.properties?.fontFamily || 'Arial'}
-              onValueChange={(value) => updateFrameProperty('fontFamily', value)}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {fontFamilies.map((font) => (
-                  <SelectItem key={font.value} value={font.value}>
-                    <span style={{ fontFamily: font.value }}>{font.label}</span>
-                  </SelectItem>
+            {/* Placeholder Text */}
+            <div className="space-y-2">
+              <Label htmlFor="placeholder">Placeholder Text</Label>
+              <Textarea
+                id="placeholder"
+                placeholder="Enter placeholder text..."
+                value={frame.properties?.placeholder || ''}
+                onChange={(e) => updateFrameProperty('placeholder', e.target.value)}
+                rows={2}
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Text Styling</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Font Family */}
+            <div className="space-y-2">
+              <Label htmlFor="font-family">Font Family</Label>
+              <Select
+                value={frame.properties?.fontFamily || 'Arial'}
+                onValueChange={(value) => updateFrameProperty('fontFamily', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {fontFamilies.map((font) => (
+                    <SelectItem key={font.value} value={font.value}>
+                      <span style={{ fontFamily: font.value }}>{font.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Font Size */}
+            <div className="space-y-2">
+              <Label htmlFor="font-size">Font Size: {frame.properties?.fontSize || 24}px</Label>
+              <Slider
+                id="font-size"
+                min={8}
+                max={72}
+                step={1}
+                value={[frame.properties?.fontSize || 24]}
+                onValueChange={([value]) => updateFrameProperty('fontSize', value)}
+                className="w-full"
+              />
+            </div>
+
+            {/* Text Color */}
+            <div className="space-y-2">
+              <Label>Text Color</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="color"
+                  value={frame.properties?.color || '#000000'}
+                  onChange={(e) => updateFrameProperty('color', e.target.value)}
+                  className="w-12 h-10 p-1"
+                />
+                <Input
+                  type="text"
+                  value={frame.properties?.color || '#000000'}
+                  onChange={(e) => updateFrameProperty('color', e.target.value)}
+                  className="flex-1"
+                />
+              </div>
+              <div className="grid grid-cols-5 gap-1">
+                {presetColors.map((color) => (
+                  <button
+                    key={color}
+                    className={cn(
+                      'w-8 h-8 rounded border-2 transition-colors',
+                      frame.properties?.color === color
+                        ? 'border-gray-900'
+                        : 'border-gray-300 hover:border-gray-500'
+                    )}
+                    style={{ backgroundColor: color }}
+                    onClick={() => updateFrameProperty('color', color)}
+                  />
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Font Size */}
-          <div className="space-y-3">
-            <Label>Font Size: {frame.properties?.fontSize || 24}px</Label>
-            <Slider
-              value={[frame.properties?.fontSize || 24]}
-              onValueChange={([value]) => updateFrameProperty('fontSize', value)}
-              min={8}
-              max={72}
-              step={1}
-              className="w-full"
-            />
-          </div>
-
-          {/* Text Alignment */}
-          <div className="space-y-2">
-            <Label>Text Alignment</Label>
-            <div className="flex gap-1">
-              {textAlignOptions.map((option) => {
-                const IconComponent = option.icon;
-                const isActive = (frame.properties?.textAlign || 'center') === option.value;
-                
-                return (
-                  <Button
-                    key={option.value}
-                    variant={isActive ? 'default' : 'outline'}
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => updateFrameProperty('textAlign', option.value)}
-                  >
-                    <IconComponent className="h-4 w-4" />
-                  </Button>
-                );
-              })}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
 
-      {/* Text Color */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Text Color</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Preset Colors */}
-          <div className="grid grid-cols-5 gap-2">
-            {presetColors.map((color) => (
-              <button
-                key={color}
-                className={cn(
-                  "w-8 h-8 rounded-md border-2 transition-all",
-                  (frame.properties?.color || '#000000') === color
-                    ? "border-gray-400 ring-2 ring-blue-500"
-                    : "border-gray-300 hover:border-gray-400"
-                )}
-                style={{ backgroundColor: color }}
-                onClick={() => updateFrameProperty('color', color)}
-              />
-            ))}
-          </div>
-
-          {/* Custom Color */}
-          <div className="space-y-2">
-            <Label htmlFor="custom-color">Custom Color</Label>
-            <div className="flex gap-2">
-              <Input
-                id="custom-color"
-                type="color"
-                value={customColor}
-                onChange={(e) => {
-                  setCustomColor(e.target.value);
-                  updateFrameProperty('color', e.target.value);
-                }}
-                className="w-16 h-10 p-1 border rounded"
-              />
-              <Input
-                type="text"
-                value={customColor}
-                onChange={(e) => {
-                  setCustomColor(e.target.value);
-                  updateFrameProperty('color', e.target.value);
-                }}
-                className="flex-1"
-                placeholder="#000000"
-              />
+            {/* Text Alignment */}
+            <div className="space-y-2">
+              <Label>Text Alignment</Label>
+              <div className="flex gap-1">
+                {textAlignOptions.map((option) => {
+                  const Icon = option.icon;
+                  return (
+                    <Button
+                      key={option.value}
+                      variant={frame.properties?.textAlign === option.value ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => updateFrameProperty('textAlign', option.value)}
+                      className="flex-1"
+                    >
+                      <Icon className="h-4 w-4" />
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Placeholder Text */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm font-medium">Placeholder Text</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <Label htmlFor="placeholder">Placeholder Text</Label>
-            <Textarea
-              id="placeholder"
-              value={frame.properties?.placeholder || ''}
-              onChange={(e) => updateFrameProperty('placeholder', e.target.value)}
-              placeholder="Enter placeholder text..."
-              rows={2}
-            />
-            <p className="text-xs text-gray-500">
-              This text will be shown to users as a hint for what to enter
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Text Guidelines</CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs text-gray-600 space-y-1">
+            <p>• Users will enter text in this frame</p>
+            <p>• Text will wrap automatically within the frame</p>
+            <p>• Recommended max characters: {Math.floor(frame.width / 8)}</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return null;
 } 

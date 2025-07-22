@@ -16,7 +16,8 @@ import {
   Share2, 
   BarChart3,
   X,
-  Sparkles
+  Sparkles,
+  Type
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +40,7 @@ const templateCategories = [
 const navigationItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutTemplate },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
+  { name: 'Fonts', href: '/dashboard/fonts', icon: Type },
 ];
 
 export default function DashboardSidebar({ onClose }: DashboardSidebarProps) {

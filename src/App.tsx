@@ -22,6 +22,7 @@ import Dashboard from "./pages/Dashboard";
 import TemplateEditor from "./pages/TemplateEditor";
 import PublicGenerator from "./pages/PublicGenerator";
 import Analytics from "./pages/Analytics";
+import FontManager from "./components/dashboard/FontManager";
 
 // Dashboard Layout
 import DashboardLayout from "./components/dashboard/DashboardLayout";
@@ -139,6 +140,7 @@ const App = () => {
                 <Route index element={<Dashboard />} />
                 <Route path="editor/:templateId" element={<TemplateEditor />} />
                 <Route path="analytics" element={<Analytics />} />
+                <Route path="fonts" element={<FontManager />} />
               </Route>
 
               {/* Public Flyer Generator */}

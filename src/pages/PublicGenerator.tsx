@@ -32,6 +32,7 @@ import { getPublicTemplate } from '@/lib/supabase';
 import { Template } from '@/integrations/supabase/types';
 import { uploadImage } from '@/lib/supabase';
 import { exportCanvasToPDF, getPDFExportOptions } from '@/lib/pdfUtils';
+import { getAvailableFonts, applyFontToContext } from '@/lib/fontUtils';
 
 interface FrameData {
   id: string;
@@ -79,9 +80,14 @@ export default function PublicGenerator() {
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  const [availableFonts, setAvailableFonts] = useState<string[]>([]);
 
-  // Load template data
+  // Load template data and fonts
   useEffect(() => {
+    // Load available fonts
+    const fonts = getAvailableFonts();
+    setAvailableFonts(fonts);
+
     if (!templateId) {
       setError('Template ID is required');
       setLoading(false);
@@ -245,7 +251,11 @@ export default function PublicGenerator() {
         if (!text) continue;
 
         const properties = frame.properties || {};
-        ctx.font = `${properties.fontSize || 24}px ${properties.fontFamily || 'Arial'}`;
+        const fontFamily = properties.fontFamily || 'Arial';
+        const fontSize = properties.fontSize || 24;
+        
+        // Apply custom font if available
+        applyFontToContext(ctx, fontFamily, fontSize);
         ctx.fillStyle = properties.color || '#000000';
         ctx.textAlign = (properties.textAlign as CanvasTextAlign) || 'center';
 
@@ -531,7 +541,7 @@ export default function PublicGenerator() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+        {/* Header */}
       <header className="sticky top-0 z-40 border-b bg-white shadow-sm">
         <div className="flex h-16 items-center justify-between px-6">
           <div className="flex items-center gap-4">
@@ -549,7 +559,7 @@ export default function PublicGenerator() {
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-semibold">
                 {template?.name || 'Personalize Template'}
-              </h1>
+          </h1>
               {template?.template_type && (
                 <Badge variant="secondary">{template.template_type}</Badge>
               )}
@@ -630,7 +640,7 @@ export default function PublicGenerator() {
                         )}
                         {frame.type === 'image' ? 'Upload Image' : 'Enter Text'}
                       </CardTitle>
-                    </CardHeader>
+              </CardHeader>
                     <CardContent className="space-y-3">
                       {frame.type === 'image' ? (
                         <div className="space-y-2">
@@ -774,7 +784,7 @@ export default function PublicGenerator() {
                     }}
                   />
                 </div>
-                
+
                 {frames.length === 0 && (
                   <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <div className="text-center text-gray-500 max-w-md bg-white/90 backdrop-blur-sm rounded-lg p-6 border">
@@ -798,7 +808,7 @@ export default function PublicGenerator() {
               <p>Fill in your information on the left to personalize your template</p>
               <p>Click PNG or PDF to download your personalized version</p>
             </div>
-          </div>
+                </div>
         </div>
       </div>
 
