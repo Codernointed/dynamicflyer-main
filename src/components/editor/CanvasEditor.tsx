@@ -4,10 +4,12 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import fabric, { Canvas, Image, Rect } from 'fabric';
+import fabric from 'fabric';
+import { Canvas, Image, Rect, Text } from 'fabric';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, RotateCcw, Download } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface FrameData {
   id: string;
@@ -48,85 +50,97 @@ export default function CanvasEditor({
     selectedFrameId,
     hasBackgroundUrl: !!backgroundUrl 
   });
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
+  const fabricCanvasRef = useRef<Canvas | null>(null);
+  
   const [zoom, setZoom] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
-  const [canvasInitialized, setCanvasInitialized] = useState(false);
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
 
-  // Calculate canvas size based on container
+  // Simple canvas size calculation
   const calculateCanvasSize = useCallback(() => {
-    if (!containerRef.current) return { width: 1200, height: 800 };
+    if (!containerRef.current) return { width: 800, height: 600 };
     
     const container = containerRef.current;
-    const containerWidth = container.clientWidth - 32; // Account for padding
-    const maxWidth = Math.min(containerWidth, 1400); // Max width limit
-    const maxHeight = Math.min(window.innerHeight - 300, 900); // Max height limit
+    const containerWidth = container.clientWidth - 32;
+    const containerHeight = container.clientHeight - 32;
     
-    // Maintain 3:2 aspect ratio
-    const aspectRatio = 3 / 2;
-    let width = maxWidth;
+    // Use fixed aspect ratio
+    const aspectRatio = 4 / 3;
+    let width = Math.min(containerWidth, 1200);
     let height = width / aspectRatio;
     
-    if (height > maxHeight) {
-      height = maxHeight;
+    if (height > containerHeight) {
+      height = containerHeight;
       width = height * aspectRatio;
     }
     
     return { width: Math.floor(width), height: Math.floor(height) };
   }, []);
 
-  // Initialize canvas
+  // Initialize canvas with minimal setup
   const initializeCanvas = useCallback(() => {
     if (!canvasRef.current || fabricCanvasRef.current) return;
 
-    // Calculate initial size
-    const initialSize = calculateCanvasSize();
-    setCanvasSize(initialSize);
+    const size = calculateCanvasSize();
+    setCanvasSize(size);
 
-    console.log('🎨 Initializing Fabric.js canvas with size:', initialSize);
+    console.log('🎨 Initializing canvas with size:', size);
 
+    // Create canvas with minimal config
     const canvas = new Canvas(canvasRef.current, {
-      width: initialSize.width,
-      height: initialSize.height,
-      backgroundColor: '#ffffff',
+      width: size.width,
+      height: size.height,
+      backgroundColor: '#f0f0f0',
       selection: true,
-      preserveObjectStacking: true,
     });
 
-    // Ensure canvas is visible
+    // Add a test rectangle immediately to verify canvas works
+    const testRect = new Rect({
+      left: 50,
+      top: 50,
+      width: 100,
+      height: 100,
+      fill: 'red',
+      stroke: 'blue',
+      strokeWidth: 3,
+    });
+    
+    canvas.add(testRect);
     canvas.renderAll();
-    console.log('✅ Canvas initialized successfully');
+    
+    console.log('✅ Canvas initialized with test rectangle');
 
     fabricCanvasRef.current = canvas;
-    setCanvasInitialized(true);
     onCanvasReady(true);
 
-    // Canvas event handlers
+    // Event handlers
     canvas.on('selection:created', handleSelection);
     canvas.on('selection:updated', handleSelection);
     canvas.on('selection:cleared', () => onFrameSelect(null));
     canvas.on('object:modified', handleObjectModified);
+
   }, [calculateCanvasSize, onCanvasReady]);
 
-  // Initialize canvas on mount
+  // Initialize on mount
   useEffect(() => {
-    initializeCanvas();
+    const timer = setTimeout(() => {
+      initializeCanvas();
+    }, 100);
 
     return () => {
+      clearTimeout(timer);
       if (fabricCanvasRef.current) {
-        console.log('🧹 Disposing canvas');
         fabricCanvasRef.current.dispose();
         fabricCanvasRef.current = null;
-        setCanvasInitialized(false);
         onCanvasReady(false);
       }
     };
   }, [initializeCanvas, onCanvasReady]);
 
-  // Handle window resize without recreating canvas
+  // Handle resize
   useEffect(() => {
     const handleResize = () => {
       const newSize = calculateCanvasSize();
@@ -140,17 +154,13 @@ export default function CanvasEditor({
     };
 
     window.addEventListener('resize', handleResize);
-    
     return () => window.removeEventListener('resize', handleResize);
   }, [calculateCanvasSize]);
 
   // Load background image
   const loadBackgroundImage = useCallback(async () => {
     if (!fabricCanvasRef.current || !backgroundUrl) {
-      console.log('⏳ Canvas not ready or no background URL:', { 
-        hasCanvas: !!fabricCanvasRef.current, 
-        backgroundUrl 
-      });
+      console.log('⏳ Canvas not ready or no background URL');
       return;
     }
 
@@ -158,78 +168,64 @@ export default function CanvasEditor({
     setIsLoading(true);
     
     try {
-      const img = await new Promise<fabric.Image>((resolve, reject) => {
-        Image.fromURL(backgroundUrl, {
-          crossOrigin: 'anonymous'
-        }).then(resolve).catch(reject);
+      // Simple image loading
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => {
+          console.log('✅ Image loaded:', { width: img.width, height: img.height });
+          resolve();
+        };
+        img.onerror = reject;
+        img.src = backgroundUrl;
       });
 
-      console.log('✅ Background image loaded successfully', { 
-        width: img.width, 
-        height: img.height,
-        canvasWidth: fabricCanvasRef.current?.width,
-        canvasHeight: fabricCanvasRef.current?.height
-      });
-      
       const canvas = fabricCanvasRef.current!;
       
-      // Scale image to fit canvas while maintaining aspect ratio
-      const canvasAspect = canvas.width! / canvas.height!;
-      const imageAspect = img.width! / img.height!;
+      // Create fabric image
+      const fabricImage = new Image(img);
       
-      let scale;
-      if (imageAspect > canvasAspect) {
-        scale = canvas.width! / img.width!;
-      } else {
-        scale = canvas.height! / img.height!;
-      }
+      // Simple scaling
+      const scale = Math.min(canvas.width! / img.width, canvas.height! / img.height);
+      fabricImage.scale(scale);
       
-      console.log('📐 Image scaling:', { scale, canvasAspect, imageAspect });
-      
-      img.scale(scale);
-      img.setCoords();
-      
-      // Make background image non-selectable and non-movable
-      img.set({
+      // Center the image
+      fabricImage.set({
+        left: canvas.width! / 2,
+        top: canvas.height! / 2,
+        originX: 'center',
+        originY: 'center',
         selectable: false,
         evented: false,
-        excludeFromExport: false,
       });
       
-      console.log('🧹 Clearing canvas and adding background...');
-      // Clear canvas and add background
+      // Clear canvas and add image
       canvas.clear();
-      canvas.add(img);
-      canvas.centerObject(img);
-      canvas.sendObjectToBack(img);
-      
-      console.log('🎨 Canvas objects after background add:', canvas.getObjects().length);
-      
-      // Force render
+      canvas.add(fabricImage);
       canvas.renderAll();
       
-      // Re-add frames after background
+      console.log('✅ Background image added to canvas');
+      
+      // Add frames
       syncFramesToCanvas();
-      console.log('✅ Canvas updated with background and frames');
+      
     } catch (error) {
       console.error('❌ Error loading background image:', error);
-      console.error('📄 Image URL:', backgroundUrl);
-      console.error('🔍 Error type:', error.name);
-      console.error('💬 Error message:', error.message);
-      console.error('📋 Full error:', error);
+      toast.error('Failed to load background image');
     } finally {
       setIsLoading(false);
     }
   }, [backgroundUrl]);
 
-  // Load background when URL changes and canvas is ready
+  // Load background when URL changes
   useEffect(() => {
-    if (canvasInitialized && backgroundUrl) {
+    if (fabricCanvasRef.current && backgroundUrl) {
       loadBackgroundImage();
     }
-  }, [canvasInitialized, backgroundUrl, loadBackgroundImage]);
+  }, [backgroundUrl, loadBackgroundImage]);
 
-  // Sync frames to canvas
+  // Sync frames
   useEffect(() => {
     if (!fabricCanvasRef.current) return;
     syncFramesToCanvas();
@@ -241,50 +237,33 @@ export default function CanvasEditor({
 
     console.log('🔄 Syncing frames to canvas, frame count:', frames.length);
 
-    // Remove existing frame objects (keep background)
+    // Remove existing frames
     const objects = canvas.getObjects();
     const frameObjects = objects.filter(obj => (obj as any).data?.isFrame);
     frameObjects.forEach(obj => canvas.remove(obj));
 
-    // Add frame objects
+    // Add new frames
     frames.forEach(frame => {
-      let fabricObject;
-      
-      if (frame.type === 'image') {
-        fabricObject = new Rect({
-          left: frame.x,
-          top: frame.y,
-          width: frame.width,
-          height: frame.height,
-          fill: 'rgba(200, 200, 255, 0.3)',
-          stroke: '#4285f4',
-          strokeWidth: 2,
-          strokeDashArray: [5, 5],
-          rx: 4,
-          ry: 4,
-        });
-      } else {
-        fabricObject = new Rect({
-          left: frame.x,
-          top: frame.y,
-          width: frame.width,
-          height: frame.height,
-          fill: 'rgba(255, 200, 200, 0.3)',
-          stroke: '#ea4335',
-          strokeWidth: 2,
-          strokeDashArray: [5, 5],
-          rx: 4,
-          ry: 4,
-        });
-      }
+      const rect = new Rect({
+        left: frame.x,
+        top: frame.y,
+        width: frame.width,
+        height: frame.height,
+        fill: frame.type === 'image' ? 'rgba(0, 100, 255, 0.3)' : 'rgba(255, 100, 0, 0.3)',
+        stroke: frame.type === 'image' ? '#0066ff' : '#ff6600',
+        strokeWidth: 2,
+        strokeDashArray: [5, 5],
+        selectable: true,
+        evented: true,
+      });
 
-      (fabricObject as any).data = {
+      (rect as any).data = {
         isFrame: true,
         frameId: frame.id,
         frameType: frame.type,
       };
 
-      canvas.add(fabricObject);
+      canvas.add(rect);
     });
 
     canvas.renderAll();
@@ -343,7 +322,7 @@ export default function CanvasEditor({
     const dataURL = fabricCanvasRef.current.toDataURL({
       format: 'png',
       quality: 1,
-      multiplier: 2, // Higher resolution
+      multiplier: 2,
     });
     
     const link = document.createElement('a');
@@ -352,39 +331,88 @@ export default function CanvasEditor({
     link.click();
   };
 
+  const handleTestCanvas = () => {
+    console.log('🧪 Testing canvas functionality...');
+    if (fabricCanvasRef.current) {
+      const canvas = fabricCanvasRef.current;
+      
+      // Clear canvas
+      canvas.clear();
+      
+      // Set background color
+      canvas.backgroundColor = '#e0e0e0';
+      canvas.renderAll();
+      
+      // Add test rectangle
+      const testRect = new Rect({
+        left: 100,
+        top: 100,
+        width: 200,
+        height: 150,
+        fill: 'rgba(255, 0, 0, 0.7)',
+        stroke: '#ff0000',
+        strokeWidth: 3,
+      });
+      
+      canvas.add(testRect);
+      canvas.renderAll();
+      console.log('✅ Test canvas setup complete - you should see a red rectangle');
+    }
+  };
+
+  const handleDebugCanvas = () => {
+    console.log('🔍 Debug canvas state...');
+    if (fabricCanvasRef.current) {
+      const canvas = fabricCanvasRef.current;
+      const objects = canvas.getObjects();
+      console.log('📊 Canvas state:', {
+        width: canvas.width,
+        height: canvas.height,
+        backgroundColor: canvas.backgroundColor,
+        objectCount: objects.length,
+        objects: objects.map((obj, index) => ({
+          index,
+          type: obj.type,
+          left: obj.left,
+          top: obj.top,
+          width: obj.width,
+          height: obj.height,
+          visible: obj.visible,
+        }))
+      });
+      
+      canvas.renderAll();
+      console.log('🔄 Canvas re-rendered');
+    }
+  };
+
   if (!backgroundUrl) {
     return (
       <div className="w-full h-full flex flex-col" ref={containerRef}>
         {/* Canvas Controls */}
         <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" disabled>
+            <Button variant="outline" size="sm" onClick={handleZoomOut}>
               <ZoomOut className="h-4 w-4" />
             </Button>
-            <span className="text-sm text-gray-600 min-w-16 text-center">100%</span>
-            <Button variant="outline" size="sm" disabled>
+            <span className="text-sm text-gray-600 min-w-16 text-center">
+              {Math.round(zoom * 100)}%
+            </span>
+            <Button variant="outline" size="sm" onClick={handleZoomIn}>
               <ZoomIn className="h-4 w-4" />
             </Button>
-            <Button variant="outline" size="sm" disabled>
+            <Button variant="outline" size="sm" onClick={handleResetZoom}>
               <RotateCcw className="h-4 w-4" />
             </Button>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">No background</span>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => {
-                // Test with a simple colored background
-                if (fabricCanvasRef.current) {
-                  fabricCanvasRef.current.backgroundColor = '#f0f0f0';
-                  fabricCanvasRef.current.renderAll();
-                  console.log('✅ Test background applied');
-                }
-              }}
-            >
+            <span className="text-xs text-gray-500">No background image</span>
+            <Button variant="outline" size="sm" onClick={handleTestCanvas}>
               Test Canvas
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleDebugCanvas}>
+              Debug Canvas
             </Button>
             <Button variant="outline" size="sm" disabled>
               <Download className="mr-2 h-4 w-4" />
@@ -393,32 +421,54 @@ export default function CanvasEditor({
           </div>
         </div>
 
-        {/* Empty State */}
-        <Card className="flex-1 flex items-center justify-center bg-gray-50">
-          <div className="text-center text-gray-500 max-w-md">
-            <div className="w-20 h-20 mx-auto mb-6 bg-gray-100 rounded-lg flex items-center justify-center">
-              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-              </svg>
+        {/* Canvas Container */}
+        <Card className="flex-1 p-4 bg-gray-50 overflow-hidden">
+          <div className="relative h-full">
+            <div className="flex justify-center items-center h-full">
+              <canvas
+                ref={canvasRef}
+                className="border-2 border-gray-300 rounded-lg shadow-lg bg-white max-w-full max-h-full"
+                width={canvasSize.width}
+                height={canvasSize.height}
+                style={{ 
+                  width: canvasSize.width, 
+                  height: canvasSize.height,
+                  maxWidth: '100%',
+                  maxHeight: '100%',
+                  display: 'block',
+                  backgroundColor: '#f0f0f0'
+                }}
+              />
             </div>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Upload a background image to start editing</h3>
-            <p className="text-sm text-gray-500 mb-4">Go to the Setup tab to add your template background image</p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-left">
-              <h4 className="text-sm font-medium text-blue-900 mb-2">Quick Start:</h4>
-              <ol className="text-xs text-blue-800 space-y-1">
-                <li>1. Click "Setup" tab on the left</li>
-                <li>2. Upload a background image</li>
-                <li>3. Switch to "Frames" tab</li>
-                <li>4. Add image and text frames</li>
-                <li>5. Customize with "Style" tab</li>
-              </ol>
+            
+            {/* Instructions */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="text-center text-gray-500 max-w-md bg-white/90 backdrop-blur-sm rounded-lg p-6 border">
+                <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-lg flex items-center justify-center">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Upload a background image</h3>
+                <p className="text-sm text-gray-500 mb-4">Go to the Setup tab to add your template background image</p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-left">
+                  <h4 className="text-sm font-medium text-blue-900 mb-2">Quick Start:</h4>
+                  <ol className="text-xs text-blue-800 space-y-1">
+                    <li>1. Click "Setup" tab on the left</li>
+                    <li>2. Upload a background image</li>
+                    <li>3. Switch to "Frames" tab</li>
+                    <li>4. Add image and text frames</li>
+                    <li>5. Customize with "Style" tab</li>
+                  </ol>
+                </div>
+              </div>
             </div>
           </div>
         </Card>
 
         {/* Help Text */}
         <div className="mt-4 text-xs text-gray-500 text-center space-y-1 flex-shrink-0">
-          <p>Canvas will appear here once you upload a background image</p>
+          <p>Canvas is ready - upload a background image to start editing</p>
           <p>Recommended size: 1200×800 pixels or larger</p>
         </div>
       </div>
@@ -448,47 +498,19 @@ export default function CanvasEditor({
           <span className="text-xs text-gray-500">
             {canvasSize.width} × {canvasSize.height}
           </span>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => {
-              console.log('🧪 Testing canvas functionality...');
-              if (fabricCanvasRef.current) {
-                // Add a test rectangle to verify canvas works
-                const testRect = new Rect({
-                  left: 50,
-                  top: 50,
-                  width: 100,
-                  height: 100,
-                  fill: 'red',
-                  stroke: 'blue',
-                  strokeWidth: 2,
-                });
-                fabricCanvasRef.current.add(testRect);
-                fabricCanvasRef.current.renderAll();
-                console.log('✅ Test rectangle added to canvas');
-              } else {
-                console.log('❌ Canvas not initialized');
-              }
-            }}
-          >
+          <Button variant="outline" size="sm" onClick={handleTestCanvas}>
             Test Canvas
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDebugCanvas}>
+            Debug Canvas
           </Button>
           <Button 
             variant="outline" 
             size="sm" 
             onClick={() => {
               console.log('🧪 Testing background loading manually...');
-              console.log('🔍 Current state:', { 
-                hasCanvas: !!fabricCanvasRef.current, 
-                backgroundUrl,
-                canvasObjects: fabricCanvasRef.current?.getObjects().length 
-              });
-              
               if (fabricCanvasRef.current && backgroundUrl) {
                 loadBackgroundImage();
-              } else {
-                console.log('❌ Canvas or background URL not available');
               }
             }}
           >
@@ -522,8 +544,6 @@ export default function CanvasEditor({
                 maxWidth: '100%',
                 maxHeight: '100%',
                 display: 'block',
-                minWidth: '400px',
-                minHeight: '300px',
                 backgroundColor: '#ffffff'
               }}
             />
@@ -534,7 +554,7 @@ export default function CanvasEditor({
       {/* Help Text */}
       <div className="mt-4 text-xs text-gray-500 text-center space-y-1">
         <p>Click and drag to move frames • Use corner handles to resize</p>
-        <p>Blue dashed areas = Image frames • Red dashed areas = Text frames</p>
+        <p>Blue dashed areas = Image frames • Orange dashed areas = Text frames</p>
       </div>
     </div>
   );
