@@ -55,7 +55,7 @@ export default function SimpleCanvasEditor({
   const initializeCanvas = useCallback(() => {
     if (!canvasRef.current) return;
 
-    console.log('🎨 Initializing simple canvas...');
+
     
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -79,7 +79,7 @@ export default function SimpleCanvasEditor({
     ctx.fillRect(50, 50, 100, 100);
     ctx.strokeRect(50, 50, 100, 100);
 
-    console.log('✅ Simple canvas initialized successfully');
+
     onCanvasReady(true);
   }, [onCanvasReady]);
 
@@ -98,11 +98,11 @@ export default function SimpleCanvasEditor({
   // Load background image
   const loadBackgroundImage = useCallback(async () => {
     if (!canvasRef.current || !backgroundUrl) {
-      console.log('⏳ Canvas not ready or no background URL');
+
       return;
     }
 
-    console.log('🎨 Loading background image:', backgroundUrl);
+
     setIsLoading(true);
 
     try {
@@ -111,7 +111,7 @@ export default function SimpleCanvasEditor({
       
       await new Promise<void>((resolve, reject) => {
         img.onload = () => {
-          console.log('✅ Image loaded:', { width: img.width, height: img.height });
+  
           setBackgroundImage(img);
           resolve();
         };
@@ -263,25 +263,7 @@ export default function SimpleCanvasEditor({
     link.click();
   };
 
-  const handleTestCanvas = () => {
-    console.log('🧪 Testing simple canvas functionality...');
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
 
-    // Clear canvas
-    ctx.fillStyle = '#e0e0e0';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Draw test rectangle
-    ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
-    ctx.strokeStyle = '#ff0000';
-    ctx.lineWidth = 3;
-    ctx.fillRect(100, 100, 200, 150);
-    ctx.strokeRect(100, 100, 200, 150);
-
-    console.log('✅ Test canvas setup complete - you should see a red rectangle');
-  };
 
   if (!backgroundUrl) {
     return (
@@ -305,9 +287,6 @@ export default function SimpleCanvasEditor({
 
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500">No background image</span>
-            <Button variant="outline" size="sm" onClick={handleTestCanvas}>
-              Test Canvas
-            </Button>
             <Button variant="outline" size="sm" disabled>
               <Download className="mr-2 h-4 w-4" />
               Export Preview
@@ -396,9 +375,6 @@ export default function SimpleCanvasEditor({
           <span className="text-xs text-gray-500">
             {canvasSize.width} × {canvasSize.height}
           </span>
-          <Button variant="outline" size="sm" onClick={handleTestCanvas}>
-            Test Canvas
-          </Button>
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             Export Preview
@@ -441,7 +417,7 @@ export default function SimpleCanvasEditor({
       {/* Help Text */}
       <div className="mt-4 text-xs text-gray-500 text-center space-y-1">
         <p>Click and drag to move frames • Blue = Image frames • Orange = Text frames</p>
-        <p>Simple HTML5 Canvas Editor - More reliable than Fabric.js</p>
+        <p>Professional template editor for creating personalized designs</p>
       </div>
     </div>
   );

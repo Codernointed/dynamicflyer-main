@@ -304,46 +304,7 @@ export default function TemplateEditor() {
 
         {/* Main Canvas Area */}
         <div className="flex-1 p-6 bg-gray-100 min-h-0">
-          {/* Debug info */}
-          <div className="mb-2 text-xs text-gray-600">
-            Debug: backgroundUrl = {backgroundUrl || 'EMPTY'} | Canvas ready: {canvasReady ? 'YES' : 'NO'} | Template ID: {templateId}
-            <Button 
-              variant="outline" 
-              size="sm" 
-              className="ml-2"
-              onClick={() => {
-                const testFrames = [
-                  {
-                    id: 'test_image_1',
-                    type: 'image' as const,
-                    x: 100,
-                    y: 100,
-                    width: 200,
-                    height: 150,
-                  },
-                  {
-                    id: 'test_text_1',
-                    type: 'text' as const,
-                    x: 350,
-                    y: 100,
-                    width: 250,
-                    height: 80,
-                    properties: {
-                      fontSize: 24,
-                      fontFamily: 'Arial',
-                      color: '#000000',
-                      textAlign: 'center',
-                      placeholder: 'Test Text Frame',
-                    },
-                  }
-                ];
-                setFrames(testFrames);
-                toast.success('Added test frames!');
-              }}
-            >
-              Add Test Frames
-            </Button>
-          </div>
+
           
           <SimpleCanvasEditor
             backgroundUrl={backgroundUrl}
