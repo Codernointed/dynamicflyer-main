@@ -183,6 +183,132 @@ export async function getUserTemplates(): Promise<Template[]> {
 }
 
 /**
+ * Search templates with advanced filtering
+ */
+export async function searchTemplates(
+  searchQuery?: string,
+  templateType?: string,
+  userId?: string
+): Promise<Template[]> {
+  try {
+    // Try to use the database function first
+    let query = supabase
+      .rpc('search_templates', {
+        search_query: searchQuery || null,
+        template_type_filter: templateType || null,
+        user_id_filter: userId || null
+      });
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  } catch (dbError) {
+    // Fallback to client-side filtering if database function doesn't exist
+    console.warn('Database search function not available, using client-side filtering');
+    
+    const { data: templates, error: fallbackError } = await supabase
+      .from('templates')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_public', true);
+
+    if (fallbackError) throw fallbackError;
+    
+    return (templates || []).filter(template => {
+      const matchesSearch = !searchQuery || 
+        template.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        template.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        template.tags?.some((tag: string) => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+      
+      const matchesType = !templateType || template.template_type === templateType;
+      
+      return matchesSearch && matchesType;
+    });
+  }
+}
+
+/**
+ * Get template statistics by type
+ */
+export async function getTemplateStatsByType(userId?: string) {
+  try {
+    const { data, error } = await supabase
+      .rpc('get_template_stats_by_type', {
+        user_id_filter: userId || null
+      });
+
+    if (error) throw error;
+    return data || [];
+  } catch (dbError) {
+    // Fallback to client-side calculation
+    console.warn('Database stats function not available, using client-side calculation');
+    
+    const { data: templates, error: fallbackError } = await supabase
+      .from('templates')
+      .select('template_type')
+      .eq('user_id', userId);
+
+    if (fallbackError) throw fallbackError;
+    
+    const stats = (templates || []).reduce((acc: any[], template) => {
+      const existing = acc.find(stat => stat.template_type === template.template_type);
+      if (existing) {
+        existing.count++;
+      } else {
+        acc.push({
+          template_type: template.template_type || 'other',
+          count: 1,
+          total_views: 0,
+          total_generations: 0
+        });
+      }
+      return acc;
+    }, []);
+    
+    return stats.sort((a, b) => b.count - a.count);
+  }
+}
+
+/**
+ * Get popular tags
+ */
+export async function getPopularTags(limit: number = 20) {
+  try {
+    const { data, error } = await supabase
+      .rpc('get_popular_tags', {
+        limit_count: limit
+      });
+
+    if (error) throw error;
+    return data || [];
+  } catch (dbError) {
+    // Fallback to client-side calculation
+    console.warn('Database tags function not available, using client-side calculation');
+    
+    const { data: templates, error: fallbackError } = await supabase
+      .from('templates')
+      .select('tags')
+      .eq('is_public', true);
+
+    if (fallbackError) throw fallbackError;
+    
+    const tagCounts: Record<string, number> = {};
+    (templates || []).forEach(template => {
+      if (template.tags && Array.isArray(template.tags)) {
+        template.tags.forEach((tag: string) => {
+          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+        });
+      }
+    });
+    
+    return Object.entries(tagCounts)
+      .map(([tag, count]) => ({ tag, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit);
+  }
+}
+
+/**
  * Get a specific template by ID (with proper permissions check)
  */
 export async function getTemplate(templateId: string): Promise<TemplateWithFrames | null> {

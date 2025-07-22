@@ -90,7 +90,7 @@ Transform the existing single-purpose UPSA MBA flyer generator into a premium, m
   - [ ] Bulk generation capabilities
 - [x] **Enhanced Features**
   - [x] Custom font upload and management
-  - [ ] Template categories and advanced search
+  - [x] Template categories and advanced search
   - [ ] Template versioning and history
   - [ ] Advanced image editing (crop, filters, effects)
 - [ ] **Performance & UX**

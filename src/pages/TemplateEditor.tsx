@@ -58,6 +58,7 @@ export default function TemplateEditor() {
   const [templateName, setTemplateName] = useState('');
   const [templateType, setTemplateType] = useState<string>('flyer');
   const [templateDescription, setTemplateDescription] = useState('');
+  const [templateTags, setTemplateTags] = useState<string[]>([]);
   
   // Canvas state
   const [backgroundUrl, setBackgroundUrl] = useState<string>('');
@@ -89,6 +90,7 @@ export default function TemplateEditor() {
         setTemplateName(templateData.name);
         setTemplateType(templateData.template_type || 'flyer');
         setTemplateDescription(templateData.description || '');
+        setTemplateTags(templateData.tags && Array.isArray(templateData.tags) ? templateData.tags : []);
         setBackgroundUrl(templateData.background_url || '');
         
         // Parse frames from JSON
@@ -111,14 +113,21 @@ export default function TemplateEditor() {
 
     setSaving(true);
     try {
-      const templateData = {
+      const templateData: any = {
         user_id: user.id,
         name: templateName.trim(),
-        template_type: templateType,
         description: templateDescription.trim(),
         background_url: backgroundUrl,
         frames: frames,
       };
+
+      // Only add new fields if they exist in the database
+      if (templateType) {
+        templateData.template_type = templateType;
+      }
+      if (templateTags && templateTags.length > 0) {
+        templateData.tags = templateTags;
+      }
 
       let savedTemplate;
       if (isNewTemplate) {
@@ -274,16 +283,18 @@ export default function TemplateEditor() {
 
           <div className="p-4 h-[calc(100vh-8rem)] overflow-y-auto">
             {activePanel === 'metadata' && (
-              <TemplateMetadataPanel
-                name={templateName}
-                type={templateType}
-                description={templateDescription}
-                backgroundUrl={backgroundUrl}
-                onNameChange={setTemplateName}
-                onTypeChange={setTemplateType}
-                onDescriptionChange={setTemplateDescription}
-                onBackgroundChange={setBackgroundUrl}
-              />
+                          <TemplateMetadataPanel
+              name={templateName}
+              type={templateType}
+              description={templateDescription}
+              tags={templateTags}
+              backgroundUrl={backgroundUrl}
+              onNameChange={setTemplateName}
+              onTypeChange={setTemplateType}
+              onDescriptionChange={setTemplateDescription}
+              onTagsChange={setTemplateTags}
+              onBackgroundChange={setBackgroundUrl}
+            />
             )}
 
             {activePanel === 'frames' && (

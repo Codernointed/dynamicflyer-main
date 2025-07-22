@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import {
   Select,
   SelectContent,
@@ -24,10 +25,12 @@ interface TemplateMetadataPanelProps {
   name: string;
   type: string;
   description: string;
+  tags: string[];
   backgroundUrl: string;
   onNameChange: (name: string) => void;
   onTypeChange: (type: string) => void;
   onDescriptionChange: (description: string) => void;
+  onTagsChange: (tags: string[]) => void;
   onBackgroundChange: (url: string) => void;
 }
 
@@ -35,21 +38,23 @@ const templateTypes = [
   { value: 'flyer', label: 'Flyer' },
   { value: 'certificate', label: 'Certificate' },
   { value: 'brochure', label: 'Brochure' },
-  { value: 'business-card', label: 'Business Card' },
+  { value: 'business_card', label: 'Business Card' },
   { value: 'invitation', label: 'Invitation' },
-  { value: 'social', label: 'Social Media' },
-  { value: 'poster', label: 'Poster' },
-  { value: 'banner', label: 'Banner' },
+  { value: 'social_media', label: 'Social Media' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'other', label: 'Other' },
 ];
 
 export default function TemplateMetadataPanel({
   name,
   type,
   description,
+  tags,
   backgroundUrl,
   onNameChange,
   onTypeChange,
   onDescriptionChange,
+  onTagsChange,
   onBackgroundChange,
 }: TemplateMetadataPanelProps) {
   const [uploading, setUploading] = useState(false);
@@ -185,6 +190,43 @@ export default function TemplateMetadataPanel({
               onChange={(e) => onDescriptionChange(e.target.value)}
               rows={3}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="template-tags">Tags</Label>
+            <div className="space-y-2">
+              <Input
+                id="template-tags"
+                placeholder="Add tags separated by commas..."
+                value={tags.join(', ')}
+                onChange={(e) => {
+                  const tagString = e.target.value;
+                  const tagArray = tagString
+                    .split(',')
+                    .map(tag => tag.trim())
+                    .filter(tag => tag.length > 0);
+                  onTagsChange(tagArray);
+                }}
+              />
+              <p className="text-xs text-gray-500">
+                Add relevant tags to help others find your template (e.g., "business, event, modern")
+              </p>
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {tags.map((tag, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs">
+                      {tag}
+                      <button
+                        onClick={() => onTagsChange(tags.filter((_, i) => i !== index))}
+                        className="ml-1 hover:text-red-500"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

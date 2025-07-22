@@ -53,28 +53,44 @@ interface TemplateCardProps {
   onViewAnalytics?: (template: Template) => void;
 }
 
+const TEMPLATE_TYPE_LABELS: Record<string, string> = {
+  flyer: 'Flyer',
+  certificate: 'Certificate',
+  brochure: 'Brochure',
+  business_card: 'Business Card',
+  invitation: 'Invitation',
+  social_media: 'Social Media',
+  marketing: 'Marketing',
+  other: 'Other'
+};
+
+const TEMPLATE_TYPE_ICONS: Record<string, string> = {
+  flyer: '📄',
+  certificate: '🏆',
+  brochure: '📋',
+  business_card: '💼',
+  invitation: '🎉',
+  social_media: '📱',
+  marketing: '📢',
+  other: '📁'
+};
+
 const getTemplateIcon = (type: string) => {
   switch (type) {
     case 'flyer': return FileImage;
     case 'certificate': return Award;
     case 'brochure': return FileText;
-    case 'business-card': return CreditCard;
+    case 'business_card': return CreditCard;
     case 'invitation': return Mail;
-    case 'social': return Share;
+    case 'social_media': return Share;
+    case 'marketing': return FileImage;
+    case 'other': return FileText;
     default: return FileImage;
   }
 };
 
 const getTemplateTypeLabel = (type: string) => {
-  const types: Record<string, string> = {
-    'flyer': 'Flyer',
-    'certificate': 'Certificate',
-    'brochure': 'Brochure',
-    'business-card': 'Business Card',
-    'invitation': 'Invitation',
-    'social': 'Social Media',
-  };
-  return types[type] || 'Template';
+  return TEMPLATE_TYPE_LABELS[type] || 'Template';
 };
 
 export default function TemplateCard({ 
@@ -237,13 +253,35 @@ export default function TemplateCard({
                 {template.name}
               </h3>
               
+              {template.description && (
+                <p className="text-sm text-gray-600 line-clamp-2">
+                  {template.description}
+                </p>
+              )}
+              
+              {/* Tags */}
+              {template.tags && Array.isArray(template.tags) && template.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {template.tags.slice(0, 3).map((tag) => (
+                    <Badge key={tag} variant="outline" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
+                  {template.tags.length > 3 && (
+                    <Badge variant="outline" className="text-xs">
+                      +{template.tags.length - 3} more
+                    </Badge>
+                  )}
+                </div>
+              )}
+              
               <div className="flex items-center justify-between text-sm text-gray-500">
                 <span>
                   Updated {formatDistanceToNow(new Date(template.updated_at), { addSuffix: true })}
                 </span>
                 <div className="flex items-center gap-1">
                   <Eye className="h-3 w-3" />
-                  <span>0</span> {/* TODO: Add actual view count */}
+                  <span>{template.view_count || 0}</span>
                 </div>
               </div>
 

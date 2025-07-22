@@ -62,6 +62,8 @@ export type Database = {
           view_count: number
           generation_count: number
           is_public: boolean
+          template_type: string
+          tags: string[]
           created_at: string
           updated_at: string
         }
@@ -78,6 +80,8 @@ export type Database = {
           view_count?: number
           generation_count?: number
           is_public?: boolean
+          template_type?: string
+          tags?: string[]
           created_at?: string
           updated_at?: string
         }
@@ -94,6 +98,8 @@ export type Database = {
           view_count?: number
           generation_count?: number
           is_public?: boolean
+          template_type?: string
+          tags?: string[]
           created_at?: string
           updated_at?: string
         }
