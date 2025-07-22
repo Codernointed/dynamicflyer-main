@@ -25,7 +25,7 @@ import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/hooks/useAuth';
 import { getTemplate, createTemplate, updateTemplate } from '@/lib/supabase';
 import { Template } from '@/integrations/supabase/types';
-import CanvasEditor from '@/components/editor/CanvasEditor';
+import SimpleCanvasEditor from '@/components/editor/SimpleCanvasEditor';
 import TemplateMetadataPanel from '@/components/editor/TemplateMetadataPanel';
 import FrameToolbar from '@/components/editor/FrameToolbar';
 import PropertiesPanel from '@/components/editor/PropertiesPanel';
@@ -307,9 +307,45 @@ export default function TemplateEditor() {
           {/* Debug info */}
           <div className="mb-2 text-xs text-gray-600">
             Debug: backgroundUrl = {backgroundUrl || 'EMPTY'} | Canvas ready: {canvasReady ? 'YES' : 'NO'} | Template ID: {templateId}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="ml-2"
+              onClick={() => {
+                const testFrames = [
+                  {
+                    id: 'test_image_1',
+                    type: 'image' as const,
+                    x: 100,
+                    y: 100,
+                    width: 200,
+                    height: 150,
+                  },
+                  {
+                    id: 'test_text_1',
+                    type: 'text' as const,
+                    x: 350,
+                    y: 100,
+                    width: 250,
+                    height: 80,
+                    properties: {
+                      fontSize: 24,
+                      fontFamily: 'Arial',
+                      color: '#000000',
+                      textAlign: 'center',
+                      placeholder: 'Test Text Frame',
+                    },
+                  }
+                ];
+                setFrames(testFrames);
+                toast.success('Added test frames!');
+              }}
+            >
+              Add Test Frames
+            </Button>
           </div>
           
-          <CanvasEditor
+          <SimpleCanvasEditor
             backgroundUrl={backgroundUrl}
             frames={frames}
             selectedFrameId={selectedFrameId}

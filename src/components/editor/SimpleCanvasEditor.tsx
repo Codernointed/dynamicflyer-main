@@ -1,10 +1,9 @@
 /**
- * Canvas Editor Component
- * Simplified and reliable Fabric.js canvas wrapper for template editing
+ * Simple Canvas Editor Component
+ * HTML5 Canvas-based editor without Fabric.js dependencies
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import fabric from 'fabric';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ZoomIn, ZoomOut, RotateCcw, Download } from 'lucide-react';
@@ -35,7 +34,7 @@ interface CanvasEditorProps {
   onCanvasReady: (ready: boolean) => void;
 }
 
-export default function CanvasEditor({
+export default function SimpleCanvasEditor({
   backgroundUrl,
   frames,
   selectedFrameId,
@@ -44,57 +43,44 @@ export default function CanvasEditor({
   onCanvasReady,
 }: CanvasEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fabricCanvasRef = useRef<fabric.Canvas | null>(null);
   const [zoom, setZoom] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  const [selectedFrame, setSelectedFrame] = useState<FrameData | null>(null);
 
   // Initialize canvas
   const initializeCanvas = useCallback(() => {
-    if (!canvasRef.current || fabricCanvasRef.current) return;
+    if (!canvasRef.current) return;
 
-    console.log('🎨 Initializing canvas...');
+    console.log('🎨 Initializing simple canvas...');
     
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
     // Set canvas size
     const width = 800;
     const height = 600;
     setCanvasSize({ width, height });
+    canvas.width = width;
+    canvas.height = height;
 
-    // Create fabric canvas
-    const canvas = new fabric.Canvas(canvasRef.current, {
-      width,
-      height,
-      backgroundColor: '#f8f9fa',
-      selection: true,
-      preserveObjectStacking: true,
-    });
+    // Clear canvas and draw background
+    ctx.fillStyle = '#f8f9fa';
+    ctx.fillRect(0, 0, width, height);
 
-    // Add a test rectangle to verify canvas works
-    const testRect = new fabric.Rect({
-      left: 50,
-      top: 50,
-      width: 100,
-      height: 100,
-      fill: 'rgba(255, 0, 0, 0.5)',
-      stroke: '#ff0000',
-      strokeWidth: 2,
-      selectable: true,
-    });
+    // Draw test rectangle
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+    ctx.strokeStyle = '#ff0000';
+    ctx.lineWidth = 2;
+    ctx.fillRect(50, 50, 100, 100);
+    ctx.strokeRect(50, 50, 100, 100);
 
-    canvas.add(testRect);
-    canvas.renderAll();
-
-    console.log('✅ Canvas initialized successfully');
-
-    fabricCanvasRef.current = canvas;
+    console.log('✅ Simple canvas initialized successfully');
     onCanvasReady(true);
-
-    // Event handlers
-    canvas.on('selection:created', handleSelection);
-    canvas.on('selection:updated', handleSelection);
-    canvas.on('selection:cleared', () => onFrameSelect(null));
-    canvas.on('object:modified', handleObjectModified);
-
   }, [onCanvasReady]);
 
   // Initialize on mount
@@ -105,17 +91,13 @@ export default function CanvasEditor({
 
     return () => {
       clearTimeout(timer);
-      if (fabricCanvasRef.current) {
-        fabricCanvasRef.current.dispose();
-        fabricCanvasRef.current = null;
-        onCanvasReady(false);
-      }
+      onCanvasReady(false);
     };
   }, [initializeCanvas, onCanvasReady]);
 
   // Load background image
   const loadBackgroundImage = useCallback(async () => {
-    if (!fabricCanvasRef.current || !backgroundUrl) {
+    if (!canvasRef.current || !backgroundUrl) {
       console.log('⏳ Canvas not ready or no background URL');
       return;
     }
@@ -124,44 +106,20 @@ export default function CanvasEditor({
     setIsLoading(true);
 
     try {
-      const canvas = fabricCanvasRef.current;
-
-      // Load image using Promise-based approach
-      const templateImg = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new window.Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => resolve(img);
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => {
+          console.log('✅ Image loaded:', { width: img.width, height: img.height });
+          setBackgroundImage(img);
+          resolve();
+        };
         img.onerror = reject;
         img.src = backgroundUrl;
       });
 
-      const fabricImage = new fabric.Image(templateImg);
-      
-      // Scale image to fit canvas
-      const scaleX = canvas.width! / fabricImage.width!;
-      const scaleY = canvas.height! / fabricImage.height!;
-      const scale = Math.min(scaleX, scaleY);
-
-      fabricImage.scale(scale);
-      fabricImage.set({
-        left: canvas.width! / 2,
-        top: canvas.height! / 2,
-        originX: 'center',
-        originY: 'center',
-        selectable: false,
-        evented: false,
-      });
-
-      // Clear canvas and add image
-      canvas.clear();
-      canvas.add(fabricImage);
-      canvas.renderAll();
-
-      console.log('✅ Background image added to canvas');
-
-      // Add frames
-      syncFramesToCanvas();
-
+      renderCanvas();
     } catch (error) {
       console.error('❌ Error loading background image:', error);
       toast.error('Failed to load background image');
@@ -172,111 +130,133 @@ export default function CanvasEditor({
 
   // Load background when URL changes
   useEffect(() => {
-    if (fabricCanvasRef.current && backgroundUrl) {
+    if (backgroundUrl) {
       loadBackgroundImage();
     }
   }, [backgroundUrl, loadBackgroundImage]);
 
-  // Sync frames
-  useEffect(() => {
-    if (!fabricCanvasRef.current) return;
-    syncFramesToCanvas();
-  }, [frames]);
+  // Render canvas
+  const renderCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
 
-  const syncFramesToCanvas = () => {
-    const canvas = fabricCanvasRef.current;
+    // Clear canvas
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw background image
+    if (backgroundImage) {
+      const scaleX = canvas.width / backgroundImage.width;
+      const scaleY = canvas.height / backgroundImage.height;
+      const scale = Math.min(scaleX, scaleY);
+
+      const scaledWidth = backgroundImage.width * scale;
+      const scaledHeight = backgroundImage.height * scale;
+      const x = (canvas.width - scaledWidth) / 2;
+      const y = (canvas.height - scaledHeight) / 2;
+
+      ctx.drawImage(backgroundImage, x, y, scaledWidth, scaledHeight);
+    }
+
+    // Draw frames
+    frames.forEach(frame => {
+      const isSelected = frame.id === selectedFrameId;
+      
+      ctx.strokeStyle = frame.type === 'image' ? '#0066ff' : '#ff6600';
+      ctx.fillStyle = frame.type === 'image' ? 'rgba(0, 100, 255, 0.3)' : 'rgba(255, 100, 0, 0.3)';
+      ctx.lineWidth = isSelected ? 3 : 2;
+      
+      // Draw dashed rectangle
+      ctx.setLineDash([5, 5]);
+      ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
+      ctx.strokeRect(frame.x, frame.y, frame.width, frame.height);
+      ctx.setLineDash([]);
+
+      // Draw frame type label
+      ctx.fillStyle = frame.type === 'image' ? '#0066ff' : '#ff6600';
+      ctx.font = '12px Arial';
+      ctx.fillText(frame.type.toUpperCase(), frame.x + 5, frame.y + 15);
+    });
+  }, [backgroundImage, frames, selectedFrameId]);
+
+  // Render when frames change
+  useEffect(() => {
+    renderCanvas();
+  }, [renderCanvas]);
+
+  // Mouse event handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
     if (!canvas) return;
 
-    console.log('🔄 Syncing frames to canvas, frame count:', frames.length);
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / zoom;
+    const y = (e.clientY - rect.top) / zoom;
 
-    // Remove existing frames
-    const objects = canvas.getObjects();
-    const frameObjects = objects.filter(obj => (obj as any).data?.isFrame);
-    frameObjects.forEach(obj => canvas.remove(obj));
+    // Check if clicking on a frame
+    const clickedFrame = frames.find(frame => 
+      x >= frame.x && x <= frame.x + frame.width &&
+      y >= frame.y && y <= frame.y + frame.height
+    );
 
-    // Add new frames
-    frames.forEach(frame => {
-      const rect = new fabric.Rect({
-        left: frame.x,
-        top: frame.y,
-        width: frame.width,
-        height: frame.height,
-        fill: frame.type === 'image' ? 'rgba(0, 100, 255, 0.3)' : 'rgba(255, 100, 0, 0.3)',
-        stroke: frame.type === 'image' ? '#0066ff' : '#ff6600',
-        strokeWidth: 2,
-        strokeDashArray: [5, 5],
-        selectable: true,
-        evented: true,
-      });
-
-      (rect as any).data = {
-        isFrame: true,
-        frameId: frame.id,
-        frameType: frame.type,
-      };
-
-      canvas.add(rect);
-    });
-
-    canvas.renderAll();
-  };
-
-  const handleSelection = (e: any) => {
-    const activeObject = e.target;
-    if ((activeObject as any)?.data?.isFrame) {
-      onFrameSelect((activeObject as any).data.frameId);
+    if (clickedFrame) {
+      setSelectedFrame(clickedFrame);
+      onFrameSelect(clickedFrame.id);
+      setIsDragging(true);
+      setDragStart({ x: x - clickedFrame.x, y: y - clickedFrame.y });
     } else {
       onFrameSelect(null);
+      setSelectedFrame(null);
     }
-  };
+  }, [frames, zoom, onFrameSelect]);
 
-  const handleObjectModified = (e: any) => {
-    const obj = e.target;
-    if (!(obj as any)?.data?.isFrame) return;
+  const handleMouseMove = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isDragging || !selectedFrame) return;
 
-    const frameId = (obj as any).data.frameId;
-    const updatedFrames = frames.map(frame => {
-      if (frame.id === frameId) {
-        return {
-          ...frame,
-          x: Math.round(obj.left || 0),
-          y: Math.round(obj.top || 0),
-          width: Math.round((obj.width || 0) * (obj.scaleX || 1)),
-          height: Math.round((obj.height || 0) * (obj.scaleY || 1)),
-        };
-      }
-      return frame;
-    });
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / zoom;
+    const y = (e.clientY - rect.top) / zoom;
+
+    const newX = Math.max(0, x - dragStart.x);
+    const newY = Math.max(0, y - dragStart.y);
+
+    const updatedFrames = frames.map(frame => 
+      frame.id === selectedFrame.id 
+        ? { ...frame, x: newX, y: newY }
+        : frame
+    );
 
     onFramesChange(updatedFrames);
-  };
+  }, [isDragging, selectedFrame, dragStart, frames, zoom, onFramesChange]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+    setSelectedFrame(null);
+  }, []);
 
   const handleZoomIn = () => {
     const newZoom = Math.min(zoom * 1.2, 3);
     setZoom(newZoom);
-    fabricCanvasRef.current?.setZoom(newZoom);
   };
 
   const handleZoomOut = () => {
     const newZoom = Math.max(zoom / 1.2, 0.3);
     setZoom(newZoom);
-    fabricCanvasRef.current?.setZoom(newZoom);
   };
 
   const handleResetZoom = () => {
     setZoom(1);
-    fabricCanvasRef.current?.setZoom(1);
   };
 
   const handleExport = () => {
-    if (!fabricCanvasRef.current) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
     
-    const dataURL = fabricCanvasRef.current.toDataURL({
-      format: 'png',
-      quality: 1,
-      multiplier: 2,
-    });
-    
+    const dataURL = canvas.toDataURL('image/png');
     const link = document.createElement('a');
     link.download = 'template-preview.png';
     link.href = dataURL;
@@ -284,58 +264,23 @@ export default function CanvasEditor({
   };
 
   const handleTestCanvas = () => {
-    console.log('🧪 Testing canvas functionality...');
-    if (fabricCanvasRef.current) {
-      const canvas = fabricCanvasRef.current;
-      
-      // Clear canvas
-      canvas.clear();
-      
-      // Set background color
-      canvas.backgroundColor = '#e0e0e0';
-      canvas.renderAll();
-      
-      // Add test rectangle
-      const testRect = new fabric.Rect({
-        left: 100,
-        top: 100,
-        width: 200,
-        height: 150,
-        fill: 'rgba(255, 0, 0, 0.7)',
-        stroke: '#ff0000',
-        strokeWidth: 3,
-      });
-      
-      canvas.add(testRect);
-      canvas.renderAll();
-      console.log('✅ Test canvas setup complete - you should see a red rectangle');
-    }
-  };
+    console.log('🧪 Testing simple canvas functionality...');
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
 
-  const handleDebugCanvas = () => {
-    console.log('🔍 Debug canvas state...');
-    if (fabricCanvasRef.current) {
-      const canvas = fabricCanvasRef.current;
-      const objects = canvas.getObjects();
-      console.log('📊 Canvas state:', {
-        width: canvas.width,
-        height: canvas.height,
-        backgroundColor: canvas.backgroundColor,
-        objectCount: objects.length,
-        objects: objects.map((obj, index) => ({
-          index,
-          type: obj.type,
-          left: obj.left,
-          top: obj.top,
-          width: obj.width,
-          height: obj.height,
-          visible: obj.visible,
-        }))
-      });
-      
-      canvas.renderAll();
-      console.log('🔄 Canvas re-rendered');
-    }
+    // Clear canvas
+    ctx.fillStyle = '#e0e0e0';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Draw test rectangle
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.7)';
+    ctx.strokeStyle = '#ff0000';
+    ctx.lineWidth = 3;
+    ctx.fillRect(100, 100, 200, 150);
+    ctx.strokeRect(100, 100, 200, 150);
+
+    console.log('✅ Test canvas setup complete - you should see a red rectangle');
   };
 
   if (!backgroundUrl) {
@@ -363,9 +308,6 @@ export default function CanvasEditor({
             <Button variant="outline" size="sm" onClick={handleTestCanvas}>
               Test Canvas
             </Button>
-            <Button variant="outline" size="sm" onClick={handleDebugCanvas}>
-              Debug Canvas
-            </Button>
             <Button variant="outline" size="sm" disabled>
               <Download className="mr-2 h-4 w-4" />
               Export Preview
@@ -379,17 +321,21 @@ export default function CanvasEditor({
             <div className="flex justify-center items-center h-full">
               <canvas
                 ref={canvasRef}
-                className="border-2 border-gray-300 rounded-lg shadow-lg bg-white"
+                className="border-2 border-gray-300 rounded-lg shadow-lg bg-white cursor-pointer"
                 width={canvasSize.width}
                 height={canvasSize.height}
                 style={{ 
-                  width: canvasSize.width, 
-                  height: canvasSize.height,
+                  width: canvasSize.width * zoom, 
+                  height: canvasSize.height * zoom,
                   maxWidth: '100%',
                   maxHeight: '100%',
                   display: 'block',
                   backgroundColor: '#f0f0f0'
                 }}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseUp}
               />
             </div>
             
@@ -453,21 +399,6 @@ export default function CanvasEditor({
           <Button variant="outline" size="sm" onClick={handleTestCanvas}>
             Test Canvas
           </Button>
-          <Button variant="outline" size="sm" onClick={handleDebugCanvas}>
-            Debug Canvas
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => {
-              console.log('🧪 Testing background loading manually...');
-              if (fabricCanvasRef.current && backgroundUrl) {
-                loadBackgroundImage();
-              }
-            }}
-          >
-            Test Background
-          </Button>
           <Button variant="outline" size="sm" onClick={handleExport}>
             <Download className="mr-2 h-4 w-4" />
             Export Preview
@@ -487,17 +418,21 @@ export default function CanvasEditor({
           <div className="flex justify-center items-center h-full">
             <canvas
               ref={canvasRef}
-              className="border-2 border-gray-300 rounded-lg shadow-lg bg-white"
+              className="border-2 border-gray-300 rounded-lg shadow-lg bg-white cursor-pointer"
               width={canvasSize.width}
               height={canvasSize.height}
               style={{ 
-                width: canvasSize.width, 
-                height: canvasSize.height,
+                width: canvasSize.width * zoom, 
+                height: canvasSize.height * zoom,
                 maxWidth: '100%',
                 maxHeight: '100%',
                 display: 'block',
                 backgroundColor: '#ffffff'
               }}
+              onMouseDown={handleMouseDown}
+              onMouseMove={handleMouseMove}
+              onMouseUp={handleMouseUp}
+              onMouseLeave={handleMouseUp}
             />
           </div>
         </div>
@@ -505,8 +440,8 @@ export default function CanvasEditor({
 
       {/* Help Text */}
       <div className="mt-4 text-xs text-gray-500 text-center space-y-1">
-        <p>Click and drag to move frames • Use corner handles to resize</p>
-        <p>Blue dashed areas = Image frames • Orange dashed areas = Text frames</p>
+        <p>Click and drag to move frames • Blue = Image frames • Orange = Text frames</p>
+        <p>Simple HTML5 Canvas Editor - More reliable than Fabric.js</p>
       </div>
     </div>
   );
