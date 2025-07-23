@@ -25,28 +25,14 @@ import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/hooks/useAuth';
 import { getTemplate, createTemplate, updateTemplate } from '@/lib/supabase';
 import { Template } from '@/integrations/supabase/types';
-import SimpleCanvasEditor from '@/components/editor/SimpleCanvasEditor';
+import EnhancedCanvasEditor, { FrameData } from '@/components/editor/EnhancedCanvasEditor';
 import TemplateMetadataPanel from '@/components/editor/TemplateMetadataPanel';
-import FrameToolbar from '@/components/editor/FrameToolbar';
-import PropertiesPanel from '@/components/editor/PropertiesPanel';
+import EnhancedFrameToolbar from '@/components/editor/EnhancedFrameToolbar';
+import EnhancedPropertiesPanel from '@/components/editor/EnhancedPropertiesPanel';
 import { toast } from 'sonner';
 import QRCodeGenerator from '@/components/shared/QRCodeGenerator';
 
-interface FrameData {
-  id: string;
-  type: 'image' | 'text';
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  properties?: {
-    fontSize?: number;
-    fontFamily?: string;
-    color?: string;
-    textAlign?: string;
-    placeholder?: string;
-  };
-}
+
 
 export default function TemplateEditor() {
   const { templateId } = useParams<{ templateId: string }>();
@@ -65,11 +51,45 @@ export default function TemplateEditor() {
   const [frames, setFrames] = useState<FrameData[]>([]);
   const [selectedFrameId, setSelectedFrameId] = useState<string | null>(null);
   const [canvasReady, setCanvasReady] = useState(false);
+  
+  // Get selected frame object
+  const selectedFrame = frames.find(f => f.id === selectedFrameId) || null;
 
   // UI state
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [activePanel, setActivePanel] = useState<'metadata' | 'frames' | 'properties'>('metadata');
+
+  // Frame management functions
+  const handleAddFrame = (frame: FrameData) => {
+    setFrames(prev => [...prev, frame]);
+    setSelectedFrameId(frame.id);
+    setActivePanel('properties');
+  };
+
+  const handleDeleteFrame = (frameId: string) => {
+    setFrames(prev => prev.filter(f => f.id !== frameId));
+    if (selectedFrameId === frameId) {
+      setSelectedFrameId(null);
+    }
+  };
+
+  const handleDuplicateFrame = (frame: FrameData) => {
+    const duplicatedFrame = {
+      ...frame,
+      id: `frame_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      x: frame.x + 20,
+      y: frame.y + 20,
+    };
+    setFrames(prev => [...prev, duplicatedFrame]);
+    setSelectedFrameId(duplicatedFrame.id);
+  };
+
+  const handleFrameUpdate = (frameId: string, updates: Partial<FrameData>) => {
+    setFrames(prev => prev.map(f => 
+      f.id === frameId ? { ...f, ...updates } : f
+    ));
+  };
 
   const isNewTemplate = templateId === 'new';
 
@@ -93,9 +113,22 @@ export default function TemplateEditor() {
         setTemplateTags(templateData.tags && Array.isArray(templateData.tags) ? templateData.tags : []);
         setBackgroundUrl(templateData.background_url || '');
         
-        // Parse frames from JSON
+        // Parse frames from JSON and ensure they have the new structure
         if (templateData.frames && Array.isArray(templateData.frames)) {
-          setFrames(templateData.frames as FrameData[]);
+          const parsedFrames = templateData.frames.map((frame: any) => ({
+            ...frame,
+            rotation: frame.rotation || 0,
+            shape: frame.shape || 'rectangle',
+            properties: {
+              fontSize: 16,
+              fontFamily: 'Arial',
+              color: '#000000',
+              textAlign: 'center',
+              placeholder: frame.type === 'text' ? 'Enter text here' : 'Image placeholder',
+              ...frame.properties,
+            },
+          }));
+          setFrames(parsedFrames as FrameData[]);
         }
       }
     } catch (error) {
@@ -174,7 +207,7 @@ export default function TemplateEditor() {
     }
   };
 
-  const selectedFrame = frames.find(frame => frame.id === selectedFrameId);
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -298,23 +331,21 @@ export default function TemplateEditor() {
             )}
 
             {activePanel === 'frames' && (
-              <FrameToolbar
+              <EnhancedFrameToolbar
                 frames={frames}
-                selectedFrameId={selectedFrameId}
-                onFramesChange={setFrames}
-                onFrameSelect={setSelectedFrameId}
-                canvasReady={canvasReady}
+                selectedFrame={selectedFrame}
+                onAddFrame={handleAddFrame}
+                onDeleteFrame={handleDeleteFrame}
+                onDuplicateFrame={handleDuplicateFrame}
               />
             )}
 
             {activePanel === 'properties' && selectedFrame && (
-              <PropertiesPanel
+              <EnhancedPropertiesPanel
                 frame={selectedFrame}
-                onFrameUpdate={(updatedFrame) => {
-                  setFrames(frames.map(f => 
-                    f.id === updatedFrame.id ? updatedFrame : f
-                  ));
-                }}
+                onFrameUpdate={handleFrameUpdate}
+                onFrameDelete={handleDeleteFrame}
+                onFrameDuplicate={handleDuplicateFrame}
               />
             )}
           </div>
@@ -324,7 +355,7 @@ export default function TemplateEditor() {
         <div className="flex-1 p-6 bg-gray-100 min-h-0">
 
           
-          <SimpleCanvasEditor
+          <EnhancedCanvasEditor
             backgroundUrl={backgroundUrl}
             frames={frames}
             selectedFrameId={selectedFrameId}
