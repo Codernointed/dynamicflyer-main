@@ -107,7 +107,7 @@ export default function TemplateCard({
   const typeLabel = getTemplateTypeLabel(template.template_type || 'flyer');
 
   const handleShare = async () => {
-    const shareUrl = `${window.location.origin}/generate/${template.id}`;
+            const shareUrl = `${window.location.origin}/flyer/${template.id}`;
     try {
       await navigator.clipboard.writeText(shareUrl);
       toast.success('Share link copied to clipboard!');
