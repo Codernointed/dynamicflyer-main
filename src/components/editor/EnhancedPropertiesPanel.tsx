@@ -83,9 +83,11 @@ export default function EnhancedPropertiesPanel({
   const [isLocked, setIsLocked] = useState(false);
 
   useEffect(() => {
-    // Load available fonts
-    const fonts = getAvailableFonts();
-    setAvailableFonts([...FONT_FAMILIES, ...fonts]);
+    // Load available fonts and ensure uniqueness
+    const customFonts = getAvailableFonts();
+    const allFonts = [...FONT_FAMILIES, ...customFonts];
+    const uniqueFonts = [...new Set(allFonts)]; // Remove duplicates
+    setAvailableFonts(uniqueFonts);
   }, []);
 
   if (!frame) {

@@ -128,34 +128,11 @@ export const loadFontFromFile = async (file: File): Promise<CustomFont> => {
  * Get all available fonts (system + custom)
  */
 export const getAvailableFonts = (): string[] => {
-  const systemFonts = [
-    'Arial',
-    'Helvetica',
-    'Times New Roman',
-    'Georgia',
-    'Verdana',
-    'Tahoma',
-    'Trebuchet MS',
-    'Impact',
-    'Comic Sans MS',
-    'Courier New',
-    'Lucida Console',
-    'Palatino',
-    'Garamond',
-    'Bookman',
-    'Avant Garde',
-    'Arial Black',
-    'Arial Narrow',
-    'Century Gothic',
-    'Franklin Gothic Medium',
-    'Gill Sans'
-  ];
-
-  // Get custom fonts from localStorage
+  // Only return custom fonts, not system fonts (to avoid duplicates)
   const customFonts = getCustomFonts();
   const customFontNames = customFonts.map(font => font.family);
 
-  return [...systemFonts, ...customFontNames];
+  return customFontNames;
 };
 
 /**

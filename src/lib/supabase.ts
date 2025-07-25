@@ -337,45 +337,25 @@ export async function getPublicTemplate(templateId: string): Promise<TemplateWit
   try {
     console.log('Fetching public template:', templateId);
     
-    // First, check if template exists at all
-    const { data: allTemplates, error: checkError } = await supabase
-      .from('templates')
-      .select('id, is_public')
-      .eq('id', templateId);
-    
-    if (checkError) {
-      console.error('Error checking template existence:', checkError);
-      throw checkError;
-    }
-    
-    if (!allTemplates || allTemplates.length === 0) {
-      console.log('Template does not exist');
-      return null;
-    }
-    
-    const templateCheck = allTemplates[0];
-    if (!templateCheck.is_public) {
-      console.log('Template exists but is not public');
-      // For development/testing, allow access to non-public templates
-      if (process.env.NODE_ENV === 'development') {
-        console.log('Development mode: allowing access to non-public template');
-      } else {
-        return null;
-      }
-    }
-    
-    console.log('Template exists and is public, fetching full data...');
-    
-    // Now fetch the full template data
+    // Single query to get public template with all data
     const { data, error } = await supabase
       .from('templates')
       .select('*')
       .eq('id', templateId)
+      .eq('is_public', true)
       .single();
 
-    if (error && error.code !== 'PGRST116') throw error;
+    if (error) {
+      if (error.code === 'PGRST116') {
+        console.log('Template not found or not public');
+        return null;
+      }
+      console.error('Error fetching template:', error);
+      throw error;
+    }
+
     if (!data) {
-      console.log('Template not found after public check');
+      console.log('Template not found');
       return null;
     }
 

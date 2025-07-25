@@ -48,8 +48,14 @@ export default function PropertiesPanel({ frame, onFrameUpdate }: PropertiesPane
 
   useEffect(() => {
     // Load available fonts (system + custom)
-    const fonts = getAvailableFonts();
-    setAvailableFonts(fonts);
+    const systemFonts = [
+      'Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Verdana', 'Tahoma',
+      'Trebuchet MS', 'Impact', 'Comic Sans MS', 'Courier New', 'Lucida Console'
+    ];
+    const customFonts = getAvailableFonts();
+    const allFonts = [...systemFonts, ...customFonts];
+    const uniqueFonts = [...new Set(allFonts)]; // Remove duplicates
+    setAvailableFonts(uniqueFonts);
   }, []);
 
   const fontFamilies = availableFonts.map(font => ({

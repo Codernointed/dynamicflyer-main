@@ -76,6 +76,7 @@ export default function PublicGenerator() {
   const [generating, setGenerating] = useState(false);
   const [shareLink, setShareLink] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
 
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -87,22 +88,25 @@ export default function PublicGenerator() {
     // Load available fonts
     const fonts = getAvailableFonts();
     setAvailableFonts(fonts);
+  }, []);
 
+  // Load template data with refresh capability
+  useEffect(() => {
     if (!templateId) {
       setError('Template ID is required');
       setLoading(false);
       return;
     }
 
-    const loadTemplate = async () => {
+    const loadTemplate = async (retryCount = 0) => {
       try {
         setLoading(true);
         setError(null);
-        console.log('Loading template with ID:', templateId);
+        console.log('Loading template with ID:', templateId, `(attempt ${retryCount + 1})`);
         
-        // Add timeout to prevent infinite loading
+        // Add timeout to prevent infinite loading (increased to 30 seconds)
         const timeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout')), 10000)
+          setTimeout(() => reject(new Error('Request timeout - please check your internet connection and try again')), 30000)
         );
         
         const templateData = await Promise.race([
@@ -151,14 +155,24 @@ export default function PublicGenerator() {
 
       } catch (err) {
         console.error('Error loading template:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load template');
+        
+        // Retry logic for network errors
+        if (retryCount < 2 && (err instanceof Error && 
+            (err.message.includes('timeout') || err.message.includes('network') || err.message.includes('fetch')))) {
+          console.log(`Retrying... (${retryCount + 1}/2)`);
+          setTimeout(() => loadTemplate(retryCount + 1), 2000);
+          return;
+        }
+        
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load template';
+        setError(errorMessage);
       } finally {
         setLoading(false);
       }
     };
 
     loadTemplate();
-  }, [templateId]);
+  }, [templateId, lastRefresh]);
 
   // Initialize canvas
   const initializeCanvas = useCallback(() => {
@@ -482,6 +496,12 @@ export default function PublicGenerator() {
     toast.success('Form reset successfully!');
   };
 
+  // Refresh template data
+  const handleRefresh = () => {
+    setLastRefresh(Date.now());
+    toast.success('Refreshing template...');
+  };
+
   // Save personalized template
   const handleSave = async () => {
     if (!template?.id) return;
@@ -625,6 +645,16 @@ export default function PublicGenerator() {
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               Reset
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRefresh}
+              disabled={loading}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              {loading ? 'Refreshing...' : 'Refresh'}
             </Button>
             
             <Button
