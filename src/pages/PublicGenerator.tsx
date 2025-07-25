@@ -29,7 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
 import { getPublicTemplate } from '@/lib/supabase';
-import { Template } from '@/integrations/supabase/types';
+import { Template, TemplateWithFrames } from '@/integrations/supabase/types';
 import { uploadImage } from '@/lib/supabase';
 import { exportCanvasToPDF, getPDFExportOptions } from '@/lib/pdfUtils';
 import { getAvailableFonts, applyFontToContext } from '@/lib/fontUtils';
@@ -63,7 +63,7 @@ export default function PublicGenerator() {
   const navigate = useNavigate();
   
   // Template state
-  const [template, setTemplate] = useState<Template | null>(null);
+  const [template, setTemplate] = useState<TemplateWithFrames | null>(null);
   const [frames, setFrames] = useState<FrameData[]>([]);
   const [backgroundUrl, setBackgroundUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
@@ -97,13 +97,22 @@ export default function PublicGenerator() {
     const loadTemplate = async () => {
       try {
         setLoading(true);
+        setError(null);
         console.log('Loading template with ID:', templateId);
         
-        const templateData = await getPublicTemplate(templateId);
+        // Add timeout to prevent infinite loading
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout')), 10000)
+        );
+        
+        const templateData = await Promise.race([
+          getPublicTemplate(templateId),
+          timeoutPromise
+        ]) as TemplateWithFrames | null;
         console.log('Template data received:', templateData);
         
         if (!templateData) {
-          setError('Template not found');
+          setError('Template not found or not public');
           return;
         }
 
@@ -111,17 +120,38 @@ export default function PublicGenerator() {
         setBackgroundUrl(templateData.background_url || '');
         
         if (templateData.frames && Array.isArray(templateData.frames)) {
-          setFrames(templateData.frames as FrameData[]);
-          console.log('Frames loaded:', templateData.frames);
+          // Convert Frame[] to FrameData[]
+          const frameDataArray: FrameData[] = templateData.frames.map(frame => ({
+            id: frame.id,
+            type: frame.type,
+            x: frame.x,
+            y: frame.y,
+            width: frame.width,
+            height: frame.height,
+            properties: frame.type === 'text' ? {
+              fontSize: frame.fontSize,
+              fontFamily: frame.fontFamily,
+              color: frame.color,
+              textAlign: frame.textAlign,
+              placeholder: frame.placeholder
+            } : undefined
+          }));
+          setFrames(frameDataArray);
+          console.log('Frames loaded:', templateData.frames.length);
+        } else {
+          console.log('No frames found in template');
+          setFrames([]);
         }
 
         // Generate share link
         const link = `${window.location.origin}/flyer/${templateId}`;
         setShareLink(link);
 
+        console.log('Template loading completed successfully');
+
       } catch (err) {
         console.error('Error loading template:', err);
-        setError('Failed to load template');
+        setError(err instanceof Error ? err.message : 'Failed to load template');
       } finally {
         setLoading(false);
       }
@@ -150,27 +180,20 @@ export default function PublicGenerator() {
     canvas.width = width;
     canvas.height = height;
 
-    console.log('Canvas initialized, calling renderCanvas...');
-    renderCanvas();
-  }, [renderCanvas]);
-
-  // Initialize canvas on mount
-  useEffect(() => {
-    if (template && backgroundUrl) {
-      initializeCanvas();
-    }
-  }, [template, backgroundUrl, initializeCanvas]);
+    console.log('Canvas initialized');
+  }, []);
 
   // Render canvas with user data
   const renderCanvas = useCallback(async () => {
-    console.log('renderCanvas called with:', { backgroundUrl, framesCount: frames.length, userDataCount: Object.keys(userData).length });
-    
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx || !backgroundUrl) {
-      console.log('renderCanvas early return:', { hasCanvas: !!canvas, hasCtx: !!ctx, hasBackgroundUrl: !!backgroundUrl });
-      return;
-    }
+    try {
+      console.log('renderCanvas called with:', { backgroundUrl, framesCount: frames.length, userDataCount: Object.keys(userData).length });
+      
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (!canvas || !ctx || !backgroundUrl) {
+        console.log('renderCanvas early return:', { hasCanvas: !!canvas, hasCtx: !!ctx, hasBackgroundUrl: !!backgroundUrl });
+        return;
+      }
 
     // Clear canvas
     ctx.fillStyle = '#ffffff';
@@ -287,14 +310,24 @@ export default function PublicGenerator() {
         }
       }
     }
-  }, [backgroundUrl, frames, userData]);
+  } catch (error) {
+    console.error('Error rendering canvas:', error);
+  }
+}, [backgroundUrl, frames, userData]);
 
-  // Re-render when user data changes
+  // Initialize canvas on mount
   useEffect(() => {
     if (template && backgroundUrl) {
+      initializeCanvas();
+    }
+  }, [template, backgroundUrl, initializeCanvas]);
+
+  // Render canvas when data changes
+  useEffect(() => {
+    if (canvasRef.current && backgroundUrl && frames.length > 0) {
       renderCanvas();
     }
-  }, [userData, renderCanvas, template, backgroundUrl]);
+  }, [backgroundUrl, frames, userData, renderCanvas]);
 
   // Handle file upload with caching
   const handleFileUpload = async (frameId: string, file: File) => {

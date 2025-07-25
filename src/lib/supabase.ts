@@ -334,25 +334,73 @@ export async function getTemplate(templateId: string): Promise<TemplateWithFrame
  * Get a public template by ID (for public flyer generation)
  */
 export async function getPublicTemplate(templateId: string): Promise<TemplateWithFrames | null> {
-  const { data, error } = await supabase
-    .from('templates')
-    .select('*')
-    .eq('id', templateId)
-    .eq('is_public', true)
-    .single();
+  try {
+    console.log('Fetching public template:', templateId);
+    
+    // First, check if template exists at all
+    const { data: allTemplates, error: checkError } = await supabase
+      .from('templates')
+      .select('id, is_public')
+      .eq('id', templateId);
+    
+    if (checkError) {
+      console.error('Error checking template existence:', checkError);
+      throw checkError;
+    }
+    
+    if (!allTemplates || allTemplates.length === 0) {
+      console.log('Template does not exist');
+      return null;
+    }
+    
+    const templateCheck = allTemplates[0];
+    if (!templateCheck.is_public) {
+      console.log('Template exists but is not public');
+      // For development/testing, allow access to non-public templates
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Development mode: allowing access to non-public template');
+      } else {
+        return null;
+      }
+    }
+    
+    console.log('Template exists and is public, fetching full data...');
+    
+    // Now fetch the full template data
+    const { data, error } = await supabase
+      .from('templates')
+      .select('*')
+      .eq('id', templateId)
+      .single();
 
-  if (error && error.code !== 'PGRST116') throw error;
-  if (!data) return null;
+    if (error && error.code !== 'PGRST116') throw error;
+    if (!data) {
+      console.log('Template not found after public check');
+      return null;
+    }
 
-  // Increment view count
-  await supabase.rpc('increment_template_view', { template_uuid: templateId });
+    console.log('Template found:', data);
 
-  const template: TemplateWithFrames = {
-    ...data,
-    frames: (data.frames as Frame[]) || []
-  };
+    // Try to increment view count, but don't fail if it doesn't work
+    try {
+      await supabase.rpc('increment_template_view', { template_uuid: templateId });
+      console.log('View count incremented');
+    } catch (viewError) {
+      console.warn('Failed to increment view count:', viewError);
+      // Don't throw - this is not critical
+    }
 
-  return template;
+    const template: TemplateWithFrames = {
+      ...data,
+      frames: (data.frames as Frame[]) || []
+    };
+
+    console.log('Returning template with frames:', template.frames?.length || 0);
+    return template;
+  } catch (error) {
+    console.error('Error in getPublicTemplate:', error);
+    throw error;
+  }
 }
 
 /**

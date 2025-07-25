@@ -16,7 +16,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                    transform scale-[0.8] sm:scale-100
                    opacity-[0.15] sm:opacity-30 md:opacity-50 lg:opacity-100"
         style={{
-          backgroundImage: "url('/Background_right_person.png')",
+          backgroundImage: "url('/asset2.jpeg')",
           backgroundSize: "contain",
           backgroundPosition: "center right",
         }}
@@ -30,7 +30,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                    transform scale-[0.8] sm:scale-80
                    opacity-[0.15] sm:opacity-30 md:opacity-50 lg:opacity-100"
         style={{
-          backgroundImage: "url('/Background_logo_on_bottom_left.png')",
+          backgroundImage: "url('/asset3.jpeg')",
           backgroundSize: "contain",
           backgroundPosition: "bottom left",
         }}
@@ -42,7 +42,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       {/* Head Image at the Top - Responsive sizing */}
       <div className="relative z-10 flex justify-center mt-4 sm:mt-6 px-4">
         <img
-          src="/Head.png"
+          src="/asset1.png"
           alt="Head"
           className="w-24 h-auto sm:w-32 md:w-40 lg:w-48 
                      transform scale-90 sm:scale-100
