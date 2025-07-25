@@ -389,13 +389,42 @@ export async function getPublicTemplate(templateId: string): Promise<TemplateWit
 export async function createTemplate(
   templateData: TablesInsert<'templates'>
 ): Promise<Template> {
+  console.log('🆕 createTemplate called with:', templateData);
+  
+  // Get the current user to ensure RLS policy works
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError) {
+    console.error('❌ Auth error in createTemplate:', authError);
+    throw new Error('Authentication error: ' + authError.message);
+  }
+  
+  if (!user) {
+    console.error('❌ No user found in createTemplate');
+    throw new Error('User not authenticated');
+  }
+
+  console.log('✅ User authenticated for create:', { userId: user.id, email: user.email });
+
+  // Ensure user_id is set correctly
+  const templateDataWithUserId = {
+    ...templateData,
+    user_id: user.id
+  };
+
+  console.log('📝 Inserting template with data:', templateDataWithUserId);
+
   const { data, error } = await supabase
     .from('templates')
-    .insert(templateData)
+    .insert(templateDataWithUserId)
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    console.error('❌ Create template error:', error);
+    throw error;
+  }
+
+  console.log('✅ Template created successfully:', data);
   return data;
 }
 
@@ -406,28 +435,99 @@ export async function updateTemplate(
   templateId: string,
   updates: TablesUpdate<'templates'>
 ): Promise<Template> {
-  // Get the current user to ensure RLS policy works
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    throw new Error('User not authenticated');
+  console.log('🔄 updateTemplate called with:', { templateId, updates });
+  
+  // Add timeout to prevent hanging
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error('Update operation timed out')), 15000);
+  });
+
+  try {
+    // Get the current user to ensure RLS policy works
+    console.log('🔐 Getting user session...');
+    let { data: { user }, error: authError } = await Promise.race([
+      supabase.auth.getUser(),
+      timeoutPromise
+    ]);
+    
+    // If no user or auth error, try to refresh the session
+    if (authError || !user) {
+      console.log('🔄 Attempting to refresh session...');
+      const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError || !session?.user) {
+        console.error('❌ Session refresh failed:', refreshError);
+        throw new Error('Session expired. Please log in again.');
+      }
+      
+      user = session.user;
+      console.log('✅ Session refreshed successfully');
+    }
+
+    console.log('✅ User authenticated:', { userId: user.id, email: user.email });
+
+    // First, let's check if the template exists and belongs to this user
+    console.log('🔍 Checking template ownership...');
+    const { data: existingTemplate, error: checkError } = await Promise.race([
+      supabase
+        .from('templates')
+        .select('id, user_id, name')
+        .eq('id', templateId)
+        .single(),
+      timeoutPromise
+    ]);
+
+    if (checkError) {
+      console.error('❌ Template check error:', checkError);
+      if (checkError.code === 'PGRST116') {
+        throw new Error('Template not found or you do not have permission to edit it');
+      }
+      throw new Error('Failed to check template: ' + checkError.message);
+    }
+
+    if (!existingTemplate) {
+      console.error('❌ Template not found');
+      throw new Error('Template not found');
+    }
+
+    console.log('✅ Template found:', existingTemplate);
+
+    if (existingTemplate.user_id !== user.id) {
+      console.error('❌ Template ownership mismatch:', { 
+        templateUserId: existingTemplate.user_id, 
+        currentUserId: user.id 
+      });
+      throw new Error('You do not have permission to edit this template');
+    }
+
+    // Don't include user_id in updates as it might cause issues
+    const cleanUpdates = { ...updates };
+    delete cleanUpdates.user_id;
+
+    console.log('📝 Updating template with:', cleanUpdates);
+
+    const { data, error } = await Promise.race([
+      supabase
+        .from('templates')
+        .update(cleanUpdates)
+        .eq('id', templateId)
+        .eq('user_id', user.id) // Ensure RLS policy is satisfied
+        .select()
+        .single(),
+      timeoutPromise
+    ]);
+
+    if (error) {
+      console.error('❌ Update error:', error);
+      throw error;
+    }
+
+    console.log('✅ Template updated successfully:', data);
+    return data;
+  } catch (error) {
+    console.error('❌ updateTemplate error:', error);
+    throw error;
   }
-
-  // Add user_id to updates to satisfy RLS policy
-  const updatesWithUserId = {
-    ...updates,
-    user_id: user.id
-  };
-
-  const { data, error } = await supabase
-    .from('templates')
-    .update(updatesWithUserId)
-    .eq('id', templateId)
-    .eq('user_id', user.id) // Additional check for RLS
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
 }
 
 /**

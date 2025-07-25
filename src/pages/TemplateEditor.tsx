@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/hooks/useAuth';
 import { getTemplate, createTemplate, updateTemplate } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Template } from '@/integrations/supabase/types';
 import EnhancedCanvasEditor, { FrameData } from '@/components/editor/EnhancedCanvasEditor';
 import TemplateMetadataPanel from '@/components/editor/TemplateMetadataPanel';
@@ -59,6 +60,7 @@ export default function TemplateEditor() {
   const [saving, setSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [activePanel, setActivePanel] = useState<'metadata' | 'frames' | 'properties'>('metadata');
+  const [saveInProgress, setSaveInProgress] = useState(false);
 
   // Frame management functions
   const handleAddFrame = (frame: FrameData) => {
@@ -139,12 +141,49 @@ export default function TemplateEditor() {
   };
 
   const handleSave = async () => {
+    console.log('🚀 handleSave called');
+    console.log('📊 Current state:', { 
+      user: user?.id, 
+      templateName, 
+      isNewTemplate, 
+      templateId: template?.id,
+      framesCount: frames.length 
+    });
+
     if (!user || !templateName.trim()) {
+      console.error('❌ Validation failed:', { hasUser: !!user, templateName });
       toast.error('Please enter a template name');
       return;
     }
 
+    // Prevent multiple simultaneous saves
+    if (saveInProgress) {
+      console.log('⚠️ Save already in progress, ignoring request');
+      return;
+    }
+
+    setSaveInProgress(true);
     setSaving(true);
+    console.log('⏳ Starting save process...');
+    
+    // Check session before starting
+    console.log('🔐 Checking session before save...');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.error('❌ No active session found');
+      toast.error('Session expired. Please log in again.');
+      setSaving(false);
+      return;
+    }
+    console.log('✅ Session is valid');
+    
+    // Add timeout to prevent hanging
+    const saveTimeout = setTimeout(() => {
+      console.error('⏰ Save operation timed out after 30 seconds');
+      toast.error('Save operation timed out. Please try again.');
+      setSaving(false);
+    }, 30000);
+    
     try {
       const templateData: any = {
         user_id: user.id,
@@ -154,39 +193,82 @@ export default function TemplateEditor() {
         frames: frames as any, // Ensure proper JSON serialization
       };
 
-      console.log('Saving template data:', templateData);
+      console.log('📝 Template data prepared:', templateData);
 
       // Only add new fields if they exist in the database
       if (templateType) {
         templateData.template_type = templateType;
+        console.log('🏷️ Added template type:', templateType);
       }
       if (templateTags && templateTags.length > 0) {
         templateData.tags = templateTags;
+        console.log('🏷️ Added template tags:', templateTags);
       }
 
       let savedTemplate;
       if (isNewTemplate) {
+        console.log('🆕 Creating new template...');
         savedTemplate = await createTemplate(templateData);
+        console.log('✅ Template created:', savedTemplate);
         toast.success('Template created successfully!');
         // Navigate to the new template ID
         navigate(`/dashboard/editor/${savedTemplate.id}`, { replace: true });
       } else if (template) {
-        savedTemplate = await updateTemplate(template.id, templateData);
-        toast.success('Template saved successfully!');
+        console.log('🔄 Updating existing template:', template.id);
+        
+        // Retry mechanism for update operations
+        let retryCount = 0;
+        const maxRetries = 2;
+        
+        while (retryCount <= maxRetries) {
+          try {
+            savedTemplate = await updateTemplate(template.id, templateData);
+            console.log('✅ Template updated:', savedTemplate);
+            toast.success('Template saved successfully!');
+            break;
+          } catch (error) {
+            retryCount++;
+            console.error(`❌ Update attempt ${retryCount} failed:`, error);
+            
+            if (retryCount > maxRetries) {
+              throw error;
+            }
+            
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+            console.log(`🔄 Retrying update (attempt ${retryCount + 1}/${maxRetries + 1})...`);
+          }
+        }
+      } else {
+        console.error('❌ No template to save');
+        toast.error('No template to save');
+        return;
       }
 
       if (savedTemplate) {
+        console.log('💾 Setting saved template in state');
         setTemplate(savedTemplate);
       }
+      
+      console.log('🎉 Save process completed successfully');
     } catch (error) {
-      console.error('Error saving template:', error);
+      console.error('❌ Error saving template:', error);
+      console.error('❌ Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      });
+      
       if (error instanceof Error) {
         toast.error(`Failed to save template: ${error.message}`);
       } else {
         toast.error('Failed to save template');
       }
     } finally {
+      console.log('🏁 Save process finished, setting saving to false');
+      clearTimeout(saveTimeout);
       setSaving(false);
+      setSaveInProgress(false);
     }
   };
 
@@ -199,16 +281,43 @@ export default function TemplateEditor() {
   };
 
   const handleShare = async () => {
+    console.log('🔗 handleShare called');
+    console.log('📊 Template state:', { 
+      hasTemplate: !!template, 
+      templateId: template?.id,
+      isNewTemplate,
+      isPublic: template?.is_public 
+    });
+
     if (!template?.id) {
+      console.error('❌ No template ID available for sharing');
       toast.error('Please save the template first');
       return;
     }
 
+    // Check if template is public
+    if (!template.is_public) {
+      console.warn('⚠️ Template is not public, making it public first...');
+      try {
+        await updateTemplate(template.id, { is_public: true });
+        console.log('✅ Template made public');
+        toast.success('Template made public and share link copied!');
+      } catch (error) {
+        console.error('❌ Failed to make template public:', error);
+        toast.error('Failed to make template public for sharing');
+        return;
+      }
+    }
+
     const shareUrl = `${window.location.origin}/flyer/${template.id}`;
+    console.log('🔗 Generated share URL:', shareUrl);
+
     try {
       await navigator.clipboard.writeText(shareUrl);
+      console.log('✅ Share URL copied to clipboard');
       toast.success('Share link copied to clipboard!');
     } catch (error) {
+      console.error('❌ Failed to copy share URL:', error);
       toast.error('Failed to copy link');
     }
   };
