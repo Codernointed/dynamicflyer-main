@@ -28,21 +28,44 @@ cd dynamic-flyer-platform
 npm install
 ```
 
-### 2. Supabase Setup
+### 2. Environment Setup
+
+Create a `.env` file in the project root:
+
+```bash
+VITE_SUPABASE_URL=https://your-project-id.supabase.co
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+### 3. Supabase Setup
 
 1. Create a new project in [Supabase](https://supabase.com)
 2. Run the database schema:
    - Go to Supabase Dashboard → SQL Editor
    - Copy and run the contents of `supabase/migrations/001_initial_schema.sql`
-3. Update your environment variables in `src/integrations/supabase/client.ts` with your project credentials
+   - Run `supabase/migrations/002_add_template_categories.sql` (optional)
+3. Get your project credentials from Settings → API
 
-### 3. Run Development Server
+### 4. Run Development Server
 
 ```bash
 npm run dev
 ```
 
-The application will be available at `http://localhost:5173`
+The application will be available at `http://localhost:8080`
+
+## 🚀 Deployment
+
+### Deploy to Vercel (Recommended)
+
+1. **Push to GitHub**: Ensure your code is in a GitHub repository
+2. **Connect to Vercel**: 
+   - Go to [vercel.com](https://vercel.com)
+   - Import your GitHub repository
+   - Add environment variables in Vercel dashboard
+3. **Deploy**: Click deploy and your app will be live!
+
+📖 **Detailed deployment guide**: See [DEPLOYMENT.md](./DEPLOYMENT.md)
 
 ## 🏗️ Architecture
 
