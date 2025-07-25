@@ -426,10 +426,23 @@ export async function updateTemplate(
   templateId: string,
   updates: TablesUpdate<'templates'>
 ): Promise<Template> {
+  // Get the current user to ensure RLS policy works
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    throw new Error('User not authenticated');
+  }
+
+  // Add user_id to updates to satisfy RLS policy
+  const updatesWithUserId = {
+    ...updates,
+    user_id: user.id
+  };
+
   const { data, error } = await supabase
     .from('templates')
-    .update(updates)
+    .update(updatesWithUserId)
     .eq('id', templateId)
+    .eq('user_id', user.id) // Additional check for RLS
     .select()
     .single();
 

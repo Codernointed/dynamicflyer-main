@@ -57,17 +57,17 @@ export default function PropertiesPanel({ frame, onFrameUpdate }: PropertiesPane
     label: font
   }));
 
-  const textAlignOptions = [
-    { value: 'left', label: 'Left', icon: AlignLeft },
-    { value: 'center', label: 'Center', icon: AlignCenter },
-    { value: 'right', label: 'Right', icon: AlignRight },
-  ];
+const textAlignOptions = [
+  { value: 'left', label: 'Left', icon: AlignLeft },
+  { value: 'center', label: 'Center', icon: AlignCenter },
+  { value: 'right', label: 'Right', icon: AlignRight },
+];
 
-  const presetColors = [
-    '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF',
-    '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080',
-    '#FFC0CB', '#A52A2A', '#808080', '#000080', '#008000',
-  ];
+const presetColors = [
+  '#000000', '#FFFFFF', '#FF0000', '#00FF00', '#0000FF',
+  '#FFFF00', '#FF00FF', '#00FFFF', '#FFA500', '#800080',
+  '#FFC0CB', '#A52A2A', '#808080', '#000080', '#008000',
+];
 
   const updateFrameProperty = (property: string, value: any) => {
     const updatedFrame = {
@@ -168,59 +168,59 @@ export default function PropertiesPanel({ frame, onFrameUpdate }: PropertiesPane
   }
 
   if (frame.type === 'text') {
-    return (
-      <div className="space-y-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium flex items-center">
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium flex items-center">
               <Type className="mr-2 h-4 w-4 text-green-600" />
-              Text Frame Properties
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Position */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="text-x">X Position</Label>
-                <Input
-                  id="text-x"
-                  type="number"
-                  value={frame.x}
-                  onChange={(e) => updateFramePosition('x', parseInt(e.target.value) || 0)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="text-y">Y Position</Label>
-                <Input
-                  id="text-y"
-                  type="number"
-                  value={frame.y}
-                  onChange={(e) => updateFramePosition('y', parseInt(e.target.value) || 0)}
-                />
-              </div>
+            Text Frame Properties
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Position */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="text-x">X Position</Label>
+              <Input
+                id="text-x"
+                type="number"
+                value={frame.x}
+                onChange={(e) => updateFramePosition('x', parseInt(e.target.value) || 0)}
+              />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="text-y">Y Position</Label>
+              <Input
+                id="text-y"
+                type="number"
+                value={frame.y}
+                onChange={(e) => updateFramePosition('y', parseInt(e.target.value) || 0)}
+              />
+            </div>
+          </div>
 
-            {/* Dimensions */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="text-width">Width</Label>
-                <Input
-                  id="text-width"
-                  type="number"
-                  value={frame.width}
-                  onChange={(e) => updateFrameDimensions('width', parseInt(e.target.value) || 10)}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="text-height">Height</Label>
-                <Input
-                  id="text-height"
-                  type="number"
-                  value={frame.height}
-                  onChange={(e) => updateFrameDimensions('height', parseInt(e.target.value) || 10)}
-                />
-              </div>
+          {/* Dimensions */}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="text-width">Width</Label>
+              <Input
+                id="text-width"
+                type="number"
+                value={frame.width}
+                onChange={(e) => updateFrameDimensions('width', parseInt(e.target.value) || 10)}
+              />
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="text-height">Height</Label>
+              <Input
+                id="text-height"
+                type="number"
+                value={frame.height}
+                onChange={(e) => updateFrameDimensions('height', parseInt(e.target.value) || 10)}
+              />
+            </div>
+          </div>
 
             {/* Placeholder Text */}
             <div className="space-y-2">
@@ -233,47 +233,47 @@ export default function PropertiesPanel({ frame, onFrameUpdate }: PropertiesPane
                 rows={2}
               />
             </div>
-          </CardContent>
-        </Card>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader>
+      <Card>
+        <CardHeader>
             <CardTitle className="text-sm font-medium">Text Styling</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Font Family */}
-            <div className="space-y-2">
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Font Family */}
+          <div className="space-y-2">
               <Label htmlFor="font-family">Font Family</Label>
-              <Select
-                value={frame.properties?.fontFamily || 'Arial'}
-                onValueChange={(value) => updateFrameProperty('fontFamily', value)}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {fontFamilies.map((font) => (
-                    <SelectItem key={font.value} value={font.value}>
-                      <span style={{ fontFamily: font.value }}>{font.label}</span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Select
+              value={frame.properties?.fontFamily || 'Arial'}
+              onValueChange={(value) => updateFrameProperty('fontFamily', value)}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {fontFamilies.map((font) => (
+                  <SelectItem key={font.value} value={font.value}>
+                    <span style={{ fontFamily: font.value }}>{font.label}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            {/* Font Size */}
+          {/* Font Size */}
             <div className="space-y-2">
               <Label htmlFor="font-size">Font Size: {frame.properties?.fontSize || 24}px</Label>
-              <Slider
+            <Slider
                 id="font-size"
-                min={8}
-                max={72}
-                step={1}
+              min={8}
+              max={72}
+              step={1}
                 value={[frame.properties?.fontSize || 24]}
                 onValueChange={([value]) => updateFrameProperty('fontSize', value)}
-                className="w-full"
-              />
-            </div>
+              className="w-full"
+            />
+          </div>
 
             {/* Text Color */}
             <div className="space-y-2">
@@ -309,41 +309,41 @@ export default function PropertiesPanel({ frame, onFrameUpdate }: PropertiesPane
               </div>
             </div>
 
-            {/* Text Alignment */}
-            <div className="space-y-2">
-              <Label>Text Alignment</Label>
-              <div className="flex gap-1">
-                {textAlignOptions.map((option) => {
+          {/* Text Alignment */}
+          <div className="space-y-2">
+            <Label>Text Alignment</Label>
+            <div className="flex gap-1">
+              {textAlignOptions.map((option) => {
                   const Icon = option.icon;
-                  return (
-                    <Button
-                      key={option.value}
+                return (
+                  <Button
+                    key={option.value}
                       variant={frame.properties?.textAlign === option.value ? 'default' : 'outline'}
-                      size="sm"
+                    size="sm"
                       onClick={() => updateFrameProperty('textAlign', option.value)}
-                      className="flex-1"
-                    >
+                    className="flex-1"
+                  >
                       <Icon className="h-4 w-4" />
-                    </Button>
-                  );
-                })}
-              </div>
+                  </Button>
+                );
+              })}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-        <Card>
-          <CardHeader>
+      <Card>
+        <CardHeader>
             <CardTitle className="text-sm font-medium">Text Guidelines</CardTitle>
-          </CardHeader>
+        </CardHeader>
           <CardContent className="text-xs text-gray-600 space-y-1">
             <p>• Users will enter text in this frame</p>
             <p>• Text will wrap automatically within the frame</p>
             <p>• Recommended max characters: {Math.floor(frame.width / 8)}</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
+        </CardContent>
+      </Card>
+    </div>
+  );
   }
 
   return null;

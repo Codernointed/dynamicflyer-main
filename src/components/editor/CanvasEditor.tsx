@@ -80,10 +80,10 @@ export default function CanvasEditor({
       strokeWidth: 2,
       selectable: true,
     });
-
+    
     canvas.add(testRect);
     canvas.renderAll();
-
+    
     console.log('✅ Canvas initialized successfully');
 
     fabricCanvasRef.current = canvas;
@@ -122,14 +122,14 @@ export default function CanvasEditor({
 
     console.log('🎨 Loading background image:', backgroundUrl);
     setIsLoading(true);
-
+    
     try {
       const canvas = fabricCanvasRef.current;
 
       // Load image using Promise-based approach
       const templateImg = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new window.Image();
-        img.crossOrigin = 'anonymous';
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
         img.onload = () => resolve(img);
         img.onerror = reject;
         img.src = backgroundUrl;
@@ -151,17 +151,17 @@ export default function CanvasEditor({
         selectable: false,
         evented: false,
       });
-
+      
       // Clear canvas and add image
       canvas.clear();
       canvas.add(fabricImage);
       canvas.renderAll();
-
+      
       console.log('✅ Background image added to canvas');
-
+      
       // Add frames
       syncFramesToCanvas();
-
+      
     } catch (error) {
       console.error('❌ Error loading background image:', error);
       toast.error('Failed to load background image');

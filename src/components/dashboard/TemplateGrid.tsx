@@ -137,10 +137,10 @@ function EmptyState({ onCreateNew }: EmptyStateProps) {
         Create your first template to get started with personalized designs.
       </p>
 
-      <Button onClick={onCreateNew}>
-        <Plus className="mr-2 h-4 w-4" />
-        Create Template
-      </Button>
+        <Button onClick={onCreateNew}>
+          <Plus className="mr-2 h-4 w-4" />
+          Create Template
+        </Button>
     </div>
   );
 } 

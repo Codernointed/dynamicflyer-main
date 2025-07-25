@@ -142,16 +142,16 @@ export default function Dashboard() {
         totalResults={templates.length}
       />
       
-      <TemplateGrid
-        templates={templates}
-        loading={loading}
+    <TemplateGrid
+      templates={templates}
+      loading={loading}
         viewMode={filters.viewMode}
-        onCreateNew={handleCreateNew}
+      onCreateNew={handleCreateNew}
         onEditTemplate={handleEditTemplate}
         onDeleteTemplate={handleDeleteTemplate}
         onDuplicateTemplate={handleDuplicateTemplate}
         onViewAnalytics={handleViewAnalytics}
-      />
+    />
     </div>
   );
 } 

@@ -151,8 +151,10 @@ export default function TemplateEditor() {
         name: templateName.trim(),
         description: templateDescription.trim(),
         background_url: backgroundUrl,
-        frames: frames,
+        frames: frames as any, // Ensure proper JSON serialization
       };
+
+      console.log('Saving template data:', templateData);
 
       // Only add new fields if they exist in the database
       if (templateType) {
@@ -178,7 +180,11 @@ export default function TemplateEditor() {
       }
     } catch (error) {
       console.error('Error saving template:', error);
-      toast.error('Failed to save template');
+      if (error instanceof Error) {
+        toast.error(`Failed to save template: ${error.message}`);
+      } else {
+        toast.error('Failed to save template');
+      }
     } finally {
       setSaving(false);
     }
@@ -316,18 +322,18 @@ export default function TemplateEditor() {
 
           <div className="p-4 h-[calc(100vh-8rem)] overflow-y-auto">
             {activePanel === 'metadata' && (
-                          <TemplateMetadataPanel
-              name={templateName}
-              type={templateType}
-              description={templateDescription}
+              <TemplateMetadataPanel
+                name={templateName}
+                type={templateType}
+                description={templateDescription}
               tags={templateTags}
-              backgroundUrl={backgroundUrl}
-              onNameChange={setTemplateName}
-              onTypeChange={setTemplateType}
-              onDescriptionChange={setTemplateDescription}
+                backgroundUrl={backgroundUrl}
+                onNameChange={setTemplateName}
+                onTypeChange={setTemplateType}
+                onDescriptionChange={setTemplateDescription}
               onTagsChange={setTemplateTags}
-              onBackgroundChange={setBackgroundUrl}
-            />
+                onBackgroundChange={setBackgroundUrl}
+              />
             )}
 
             {activePanel === 'frames' && (
