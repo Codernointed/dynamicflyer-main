@@ -41,12 +41,17 @@ interface FrameData {
   y: number;
   width: number;
   height: number;
+  rotation: number;
+  shape: 'rectangle' | 'circle' | 'rounded-rectangle' | 'polygon';
+  cornerRadius?: number; // For rounded rectangles
+  points?: number[][]; // For polygons
   properties?: {
     fontSize?: number;
     fontFamily?: string;
     color?: string;
     textAlign?: string;
     placeholder?: string;
+    content?: string;
   };
 }
 
@@ -83,6 +88,42 @@ export default function PublicGenerator() {
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [availableFonts, setAvailableFonts] = useState<string[]>([]);
 
+  // Shape drawing helper functions
+  const createShapePath = (ctx: CanvasRenderingContext2D, frame: FrameData) => {
+    ctx.beginPath();
+    
+    switch (frame.shape) {
+      case 'circle':
+        const centerX = frame.x + frame.width / 2;
+        const centerY = frame.y + frame.height / 2;
+        const radius = Math.min(frame.width, frame.height) / 2;
+        ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+        break;
+        
+      case 'rounded-rectangle':
+        const cornerRadius = frame.cornerRadius || 10;
+        ctx.roundRect(frame.x, frame.y, frame.width, frame.height, cornerRadius);
+        break;
+        
+      case 'polygon':
+        if (frame.points && frame.points.length > 0) {
+          ctx.moveTo(frame.x + frame.points[0][0], frame.y + frame.points[0][1]);
+          for (let i = 1; i < frame.points.length; i++) {
+            ctx.lineTo(frame.x + frame.points[i][0], frame.y + frame.points[i][1]);
+          }
+          ctx.closePath();
+        } else {
+          // Fallback to rectangle
+          ctx.rect(frame.x, frame.y, frame.width, frame.height);
+        }
+        break;
+        
+      default: // rectangle
+        ctx.rect(frame.x, frame.y, frame.width, frame.height);
+        break;
+    }
+  };
+
   // Load template data and fonts
   useEffect(() => {
     // Load available fonts
@@ -109,6 +150,7 @@ export default function PublicGenerator() {
           setTimeout(() => reject(new Error('Request timeout - please check your internet connection and try again')), 30000)
         );
         
+        // Add cache-busting parameter to ensure we get the latest template data
         const templateData = await Promise.race([
           getPublicTemplate(templateId),
           timeoutPromise
@@ -124,22 +166,33 @@ export default function PublicGenerator() {
         setBackgroundUrl(templateData.background_url || '');
         
         if (templateData.frames && Array.isArray(templateData.frames)) {
-          // Convert Frame[] to FrameData[]
-          const frameDataArray: FrameData[] = templateData.frames.map(frame => ({
-            id: frame.id,
-            type: frame.type,
-            x: frame.x,
-            y: frame.y,
-            width: frame.width,
-            height: frame.height,
-            properties: frame.type === 'text' ? {
-              fontSize: frame.fontSize,
-              fontFamily: frame.fontFamily,
-              color: frame.color,
-              textAlign: frame.textAlign,
-              placeholder: frame.placeholder
-            } : undefined
-          }));
+          // Convert Frame[] to FrameData[] - handle both typed and raw JSON frames
+          const frameDataArray: FrameData[] = templateData.frames.map(frame => {
+            // Handle frames that might be stored as raw JSON with additional properties
+            const rawFrame = frame as any;
+            
+            console.log('Processing frame:', rawFrame); // Debug log
+            
+            return {
+              id: frame.id,
+              type: frame.type,
+              x: frame.x,
+              y: frame.y,
+              width: frame.width,
+              height: frame.height,
+              rotation: frame.rotation || 0,
+              shape: rawFrame.shape || 'rectangle',
+              cornerRadius: rawFrame.cornerRadius,
+              points: rawFrame.points,
+              properties: frame.type === 'text' ? {
+                fontSize: rawFrame.properties?.fontSize || rawFrame.fontSize || 24,
+                fontFamily: rawFrame.properties?.fontFamily || rawFrame.fontFamily || 'Arial',
+                color: rawFrame.properties?.color || rawFrame.color || '#000000',
+                textAlign: rawFrame.properties?.textAlign || rawFrame.textAlign || 'center',
+                placeholder: rawFrame.properties?.placeholder || rawFrame.placeholder || ''
+              } : undefined
+            };
+          });
           setFrames(frameDataArray);
           console.log('Frames loaded:', templateData.frames.length);
         } else {
@@ -187,9 +240,9 @@ export default function PublicGenerator() {
       return;
     }
 
-    // Set canvas size
-    const width = 800;
-    const height = 600;
+    // Set canvas size - match the editor dimensions
+    const width = 1200; // Match editor width
+    const height = 800; // Match editor height
     setCanvasSize({ width, height });
     canvas.width = width;
     canvas.height = height;
@@ -269,11 +322,28 @@ export default function PublicGenerator() {
               sourceY = (userImage.height - sourceHeight) / 2;
             }
 
+            // Apply rotation and shape clipping
+            ctx.save();
+            
+            // Move to frame center for rotation
+            const centerX = frame.x + frame.width / 2;
+            const centerY = frame.y + frame.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate((frame.rotation || 0) * Math.PI / 180);
+            ctx.translate(-centerX, -centerY);
+            
+            // Create clipping path for shape
+            createShapePath(ctx, frame);
+            ctx.clip();
+            
+            // Draw the image
             ctx.drawImage(
               userImage,
               sourceX, sourceY, sourceWidth, sourceHeight,
               frame.x, frame.y, drawWidth, drawHeight
             );
+            
+            ctx.restore();
             resolve();
           };
           userImage.onerror = reject;
@@ -291,10 +361,39 @@ export default function PublicGenerator() {
         const fontFamily = properties.fontFamily || 'Arial';
         const fontSize = properties.fontSize || 24;
         
+        console.log('Rendering text with properties:', {
+          frameId: frame.id,
+          properties,
+          fontFamily,
+          fontSize,
+          color: properties.color,
+          textAlign: properties.textAlign
+        });
+        
+        // Apply rotation and shape clipping
+        ctx.save();
+        
+        // Move to frame center for rotation
+        const centerX = frame.x + frame.width / 2;
+        const centerY = frame.y + frame.height / 2;
+        ctx.translate(centerX, centerY);
+        ctx.rotate((frame.rotation || 0) * Math.PI / 180);
+        ctx.translate(-centerX, -centerY);
+        
+        // Create clipping path for shape
+        createShapePath(ctx, frame);
+        ctx.clip();
+        
         // Apply custom font if available
         applyFontToContext(ctx, fontFamily, fontSize);
         ctx.fillStyle = properties.color || '#000000';
         ctx.textAlign = (properties.textAlign as CanvasTextAlign) || 'center';
+        
+        console.log('Applied text styles:', {
+          font: `${fontSize}px "${fontFamily}"`,
+          fillStyle: ctx.fillStyle,
+          textAlign: ctx.textAlign
+        });
 
         // Calculate text position
         const textX = frame.x + frame.width / 2;
@@ -322,6 +421,8 @@ export default function PublicGenerator() {
         if (currentLine) {
           ctx.fillText(currentLine, textX, currentY);
         }
+        
+        ctx.restore();
       }
     }
   } catch (error) {

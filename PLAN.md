@@ -62,6 +62,9 @@ Transform the existing single-purpose UPSA MBA flyer generator into a premium, m
   - [x] Template metadata (name, type, description) with guidelines
   - [x] Template save/load functionality with proper state management
   - [x] **Production-ready editor** - Cleaned up debug features, professional UI
+  - [x] **Background Aspect Ratio Preservation** - Images maintain proper proportions
+  - [x] **Snap/Grid System** - Visual guides and snapping to grid and other frames
+  - [x] **Canvas Size Standardization** - Consistent 1200x800 canvas across editor and generator
 
 ### Phase 5: Public Generator ✅
 - [x] **Public Template Personalization**
@@ -77,6 +80,7 @@ Transform the existing single-purpose UPSA MBA flyer generator into a premium, m
     - [x] Reset form functionality
     - [x] Share link copying
     - [x] QR code generation for easy sharing
+    - [x] **Frame Property Support** - Rotation, shapes (circle, rounded rectangle, polygon), colors, fonts
 
 ### Phase 6: Premium Features
 - [x] **Analytics & Insights**

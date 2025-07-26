@@ -53,6 +53,8 @@ interface DragState {
 const RESIZE_HANDLE_SIZE = 8;
 const ROTATION_HANDLE_DISTANCE = 30;
 const SNAP_THRESHOLD = 10;
+const GRID_SIZE = 20; // Grid size for snapping
+const SNAP_DISTANCE = 10; // Distance for snapping to grid and other frames
 
 export default function EnhancedCanvasEditor({
   backgroundUrl,
@@ -77,11 +79,76 @@ export default function EnhancedCanvasEditor({
     startFrame: null,
     resizeHandle: null,
   });
+  const [snapLines, setSnapLines] = useState<{ x?: number; y?: number; type: 'horizontal' | 'vertical' }[]>([]);
 
   const selectedFrame = useMemo(() => 
     frames.find(f => f.id === selectedFrameId) || null, 
     [frames, selectedFrameId]
   );
+
+  // Snap functions
+  const snapToGrid = (value: number): number => {
+    return Math.round(value / GRID_SIZE) * GRID_SIZE;
+  };
+
+  const snapToFrame = (x: number, y: number, excludeFrameId?: string): { x: number; y: number; snapLines: { x?: number; y?: number; type: 'horizontal' | 'vertical' }[] } => {
+    let snappedX = x;
+    let snappedY = y;
+    const lines: { x?: number; y?: number; type: 'horizontal' | 'vertical' }[] = [];
+    
+    frames.forEach(frame => {
+      if (frame.id === excludeFrameId) return;
+      
+      // Snap to frame edges
+      const frameLeft = frame.x;
+      const frameRight = frame.x + frame.width;
+      const frameTop = frame.y;
+      const frameBottom = frame.y + frame.height;
+      const frameCenterX = frame.x + frame.width / 2;
+      const frameCenterY = frame.y + frame.height / 2;
+      
+      // Horizontal snapping
+      if (Math.abs(x - frameLeft) < SNAP_DISTANCE) {
+        snappedX = frameLeft;
+        lines.push({ x: frameLeft, type: 'vertical' });
+      }
+      if (Math.abs(x - frameRight) < SNAP_DISTANCE) {
+        snappedX = frameRight;
+        lines.push({ x: frameRight, type: 'vertical' });
+      }
+      if (Math.abs(x - frameCenterX) < SNAP_DISTANCE) {
+        snappedX = frameCenterX;
+        lines.push({ x: frameCenterX, type: 'vertical' });
+      }
+      
+      // Vertical snapping
+      if (Math.abs(y - frameTop) < SNAP_DISTANCE) {
+        snappedY = frameTop;
+        lines.push({ y: frameTop, type: 'horizontal' });
+      }
+      if (Math.abs(y - frameBottom) < SNAP_DISTANCE) {
+        snappedY = frameBottom;
+        lines.push({ y: frameBottom, type: 'horizontal' });
+      }
+      if (Math.abs(y - frameCenterY) < SNAP_DISTANCE) {
+        snappedY = frameCenterY;
+        lines.push({ y: frameCenterY, type: 'horizontal' });
+      }
+    });
+    
+    return { x: snappedX, y: snappedY, snapLines: lines };
+  };
+
+  const snapPosition = (x: number, y: number, excludeFrameId?: string): { x: number; y: number; snapLines: { x?: number; y?: number; type: 'horizontal' | 'vertical' }[] } => {
+    // First snap to grid
+    let snappedX = snapToGrid(x);
+    let snappedY = snapToGrid(y);
+    
+    // Then snap to other frames
+    const frameSnap = snapToFrame(snappedX, snappedY, excludeFrameId);
+    
+    return frameSnap;
+  };
 
   // Initialize canvas
   const initializeCanvas = useCallback(() => {
@@ -91,9 +158,9 @@ export default function EnhancedCanvasEditor({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size
-    const width = 800;
-    const height = 600;
+    // Set canvas size - use standard aspect ratios
+    const width = 1200; // Standard flyer width
+    const height = 800; // Standard flyer height (3:2 ratio)
     setCanvasSize({ width, height });
     canvas.width = width;
     canvas.height = height;
@@ -161,9 +228,50 @@ export default function EnhancedCanvasEditor({
     ctx.save();
     ctx.scale(zoom, zoom);
 
-    // Draw background
+    // Draw grid (only when zoomed in enough)
+    if (zoom > 0.5) {
+      ctx.strokeStyle = '#e5e7eb';
+      ctx.lineWidth = 1;
+      
+      // Vertical lines
+      for (let x = 0; x <= canvasSize.width; x += GRID_SIZE) {
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, canvasSize.height);
+        ctx.stroke();
+      }
+      
+      // Horizontal lines
+      for (let y = 0; y <= canvasSize.height; y += GRID_SIZE) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvasSize.width, y);
+        ctx.stroke();
+      }
+    }
+
+    // Draw background with aspect ratio preservation
     if (backgroundImage) {
-      ctx.drawImage(backgroundImage, 0, 0, canvasSize.width, canvasSize.height);
+      const imgAspectRatio = backgroundImage.width / backgroundImage.height;
+      const canvasAspectRatio = canvasSize.width / canvasSize.height;
+      
+      let drawWidth, drawHeight, drawX, drawY;
+      
+      if (imgAspectRatio > canvasAspectRatio) {
+        // Image is wider than canvas - fit to width
+        drawWidth = canvasSize.width;
+        drawHeight = canvasSize.width / imgAspectRatio;
+        drawX = 0;
+        drawY = (canvasSize.height - drawHeight) / 2;
+      } else {
+        // Image is taller than canvas - fit to height
+        drawHeight = canvasSize.height;
+        drawWidth = canvasSize.height * imgAspectRatio;
+        drawX = (canvasSize.width - drawWidth) / 2;
+        drawY = 0;
+      }
+      
+      ctx.drawImage(backgroundImage, drawX, drawY, drawWidth, drawHeight);
     } else {
       ctx.fillStyle = '#f8f9fa';
       ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
@@ -173,6 +281,27 @@ export default function EnhancedCanvasEditor({
     frames.forEach(frame => {
       drawFrame(ctx, frame, frame.id === selectedFrameId);
     });
+
+    // Draw snap lines
+    if (snapLines.length > 0) {
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([5, 5]);
+      
+      snapLines.forEach(line => {
+        ctx.beginPath();
+        if (line.type === 'vertical' && line.x !== undefined) {
+          ctx.moveTo(line.x, 0);
+          ctx.lineTo(line.x, canvasSize.height);
+        } else if (line.type === 'horizontal' && line.y !== undefined) {
+          ctx.moveTo(0, line.y);
+          ctx.lineTo(canvasSize.width, line.y);
+        }
+        ctx.stroke();
+      });
+      
+      ctx.setLineDash([]);
+    }
 
     ctx.restore();
   }, [frames, selectedFrameId, backgroundImage, canvasSize, zoom]);
@@ -542,8 +671,16 @@ export default function EnhancedCanvasEditor({
       const newFrame = { ...f };
 
       if (dragState.isDragging) {
-        newFrame.x = dragState.startFrame!.x + deltaX;
-        newFrame.y = dragState.startFrame!.y + deltaY;
+        const newX = dragState.startFrame!.x + deltaX;
+        const newY = dragState.startFrame!.y + deltaY;
+        
+        // Apply snapping
+        const snapped = snapPosition(newX, newY, f.id);
+        newFrame.x = snapped.x;
+        newFrame.y = snapped.y;
+        
+        // Update snap lines for visual feedback
+        setSnapLines(snapped.snapLines);
       } else if (dragState.isResizing) {
         const handle = dragState.resizeHandle;
         if (handle?.includes('e')) {
@@ -585,6 +722,7 @@ export default function EnhancedCanvasEditor({
       startFrame: null,
       resizeHandle: null,
     });
+    setSnapLines([]); // Clear snap lines when dragging stops
   }, []);
 
   // Keyboard shortcuts
@@ -598,19 +736,27 @@ export default function EnhancedCanvasEditor({
       switch (e.key) {
         case 'ArrowLeft':
           e.preventDefault();
-          updateFrame({ x: selectedFrame.x - step });
+          const newX = selectedFrame.x - step;
+          const snappedX = snapToGrid(newX);
+          updateFrame({ x: snappedX });
           break;
         case 'ArrowRight':
           e.preventDefault();
-          updateFrame({ x: selectedFrame.x + step });
+          const newXRight = selectedFrame.x + step;
+          const snappedXRight = snapToGrid(newXRight);
+          updateFrame({ x: snappedXRight });
           break;
         case 'ArrowUp':
           e.preventDefault();
-          updateFrame({ y: selectedFrame.y - step });
+          const newY = selectedFrame.y - step;
+          const snappedY = snapToGrid(newY);
+          updateFrame({ y: snappedY });
           break;
         case 'ArrowDown':
           e.preventDefault();
-          updateFrame({ y: selectedFrame.y + step });
+          const newYDown = selectedFrame.y + step;
+          const snappedYDown = snapToGrid(newYDown);
+          updateFrame({ y: snappedYDown });
           break;
         case 'Delete':
         case 'Backspace':
