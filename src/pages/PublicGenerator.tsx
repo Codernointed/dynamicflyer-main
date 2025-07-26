@@ -171,7 +171,7 @@ export default function PublicGenerator() {
             // Handle frames that might be stored as raw JSON with additional properties
             const rawFrame = frame as any;
             
-            console.log('Processing frame:', rawFrame); // Debug log
+
             
             return {
               id: frame.id,
@@ -195,6 +195,7 @@ export default function PublicGenerator() {
           });
           setFrames(frameDataArray);
           console.log('Frames loaded:', templateData.frames.length);
+          console.log('Sample frame data:', frameDataArray[0]); // Debug: show first frame
         } else {
           console.log('No frames found in template');
           setFrames([]);
@@ -361,14 +362,7 @@ export default function PublicGenerator() {
         const fontFamily = properties.fontFamily || 'Arial';
         const fontSize = properties.fontSize || 24;
         
-        console.log('Rendering text with properties:', {
-          frameId: frame.id,
-          properties,
-          fontFamily,
-          fontSize,
-          color: properties.color,
-          textAlign: properties.textAlign
-        });
+
         
         // Apply rotation and shape clipping
         ctx.save();
@@ -389,11 +383,7 @@ export default function PublicGenerator() {
         ctx.fillStyle = properties.color || '#000000';
         ctx.textAlign = (properties.textAlign as CanvasTextAlign) || 'center';
         
-        console.log('Applied text styles:', {
-          font: `${fontSize}px "${fontFamily}"`,
-          fillStyle: ctx.fillStyle,
-          textAlign: ctx.textAlign
-        });
+
 
         // Calculate text position
         const textX = frame.x + frame.width / 2;
