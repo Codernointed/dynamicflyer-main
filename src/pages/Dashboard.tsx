@@ -58,7 +58,15 @@ export default function Dashboard() {
         
         // Load user templates
         const userTemplates = await getUserTemplates();
-        setTemplates(userTemplates);
+        
+        // Double-check that all templates belong to the current user
+        const filteredTemplates = userTemplates.filter(template => template.user_id === user.id);
+        
+        if (filteredTemplates.length !== userTemplates.length) {
+          console.warn('Some templates were filtered out due to ownership mismatch');
+        }
+        
+        setTemplates(filteredTemplates);
       } catch (error) {
         console.error('Error loading initial data:', error);
         toast.error('Failed to load data');

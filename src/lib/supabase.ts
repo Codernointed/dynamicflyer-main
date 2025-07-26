@@ -173,9 +173,16 @@ export async function getCurrentProfile(): Promise<Profile | null> {
  * Get all templates for the current user
  */
 export async function getUserTemplates(): Promise<Template[]> {
+  // Get the current user to ensure we only fetch their templates
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) {
+    throw new Error('User not authenticated');
+  }
+
   const { data, error } = await supabase
     .from('templates')
     .select('*')
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
