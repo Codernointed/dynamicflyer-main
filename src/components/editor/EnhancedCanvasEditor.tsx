@@ -34,9 +34,10 @@ interface CanvasEditorProps {
   backgroundUrl: string;
   frames: FrameData[];
   selectedFrameId: string | null;
-  onFramesChange: (frames: FrameData[]) => void;
+  onFramesChange?: (frames: FrameData[]) => void;
   onFrameSelect: (frameId: string | null) => void;
   onCanvasReady: (ready: boolean) => void;
+  readOnly?: boolean;
 }
 
 interface DragState {
@@ -60,6 +61,7 @@ export default function EnhancedCanvasEditor({
   onFramesChange,
   onFrameSelect,
   onCanvasReady,
+  readOnly = false,
 }: CanvasEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [zoom, setZoom] = useState(1);
@@ -588,7 +590,7 @@ export default function EnhancedCanvasEditor({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!selectedFrame) return;
+      if (!selectedFrame || readOnly) return;
 
       const step = e.shiftKey ? 10 : 1;
       const rotationStep = e.shiftKey ? 15 : 5;
@@ -632,7 +634,7 @@ export default function EnhancedCanvasEditor({
   }, [selectedFrame, onFrameSelect]);
 
   const updateFrame = (updates: Partial<FrameData>) => {
-    if (!selectedFrame) return;
+    if (!selectedFrame || readOnly || !onFramesChange) return;
     
     const updatedFrames = frames.map(f => 
       f.id === selectedFrame.id ? { ...f, ...updates } : f
@@ -671,15 +673,22 @@ export default function EnhancedCanvasEditor({
 
   return (
     <Card className="relative overflow-hidden">
+      {/* Read-only indicator */}
+      {readOnly && (
+        <div className="absolute top-2 right-2 z-10 bg-yellow-100 border border-yellow-300 text-yellow-800 px-2 py-1 rounded text-xs font-medium">
+          Read Only
+        </div>
+      )}
+      
       {/* Canvas Container */}
       <div className="relative bg-gray-100">
         <canvas
           ref={canvasRef}
           className="block cursor-default"
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          onMouseDown={readOnly ? undefined : handleMouseDown}
+          onMouseMove={readOnly ? undefined : handleMouseMove}
+          onMouseUp={readOnly ? undefined : handleMouseUp}
+          onMouseLeave={readOnly ? undefined : handleMouseUp}
         />
         
         {/* Loading overlay */}

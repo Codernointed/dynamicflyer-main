@@ -25,7 +25,7 @@ import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/hooks/useAuth';
 import { getTemplate, createTemplate, updateTemplate } from '@/lib/supabase';
 import { supabase } from '@/integrations/supabase/client';
-import { Template } from '@/integrations/supabase/types';
+import { Template, TemplateWithFrames } from '@/integrations/supabase/types';
 import EnhancedCanvasEditor, { FrameData } from '@/components/editor/EnhancedCanvasEditor';
 import TemplateMetadataPanel from '@/components/editor/TemplateMetadataPanel';
 import EnhancedFrameToolbar from '@/components/editor/EnhancedFrameToolbar';
@@ -41,7 +41,7 @@ export default function TemplateEditor() {
   const { user } = useAuth();
 
   // Template state
-  const [template, setTemplate] = useState<Template | null>(null);
+  const [template, setTemplate] = useState<TemplateWithFrames | null>(null);
   const [templateName, setTemplateName] = useState('');
   const [templateType, setTemplateType] = useState<string>('flyer');
   const [templateDescription, setTemplateDescription] = useState('');
@@ -94,6 +94,7 @@ export default function TemplateEditor() {
   };
 
   const isNewTemplate = templateId === 'new';
+  const canEditTemplate = !template || template.user_id === user?.id;
 
   // Load existing template
   useEffect(() => {
@@ -101,6 +102,14 @@ export default function TemplateEditor() {
       loadTemplate();
     }
   }, [templateId, isNewTemplate]);
+
+  // Check template ownership when template loads
+  useEffect(() => {
+    if (template && user && template.user_id !== user.id) {
+      console.warn('⚠️ Template ownership mismatch detected');
+      toast.error('This template belongs to a different account. You can view it but cannot edit it.');
+    }
+  }, [template, user]);
 
   const loadTemplate = async () => {
     if (!templateId) return;
@@ -251,19 +260,26 @@ export default function TemplateEditor() {
       }
       
       console.log('🎉 Save process completed successfully');
-    } catch (error) {
-      console.error('❌ Error saving template:', error);
-      console.error('❌ Error details:', {
-        name: error instanceof Error ? error.name : 'Unknown',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : undefined
-      });
-      
-      if (error instanceof Error) {
-        toast.error(`Failed to save template: ${error.message}`);
-      } else {
-        toast.error('Failed to save template');
-      }
+            } catch (error) {
+          console.error('❌ Error saving template:', error);
+          console.error('❌ Error details:', {
+            name: error instanceof Error ? error.name : 'Unknown',
+            message: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined
+          });
+
+          if (error instanceof Error) {
+            // Check for specific ownership error
+            if (error.message.includes('permission to edit this template')) {
+              toast.error('This template belongs to a different account. Please log in with the correct account or create a new template.');
+            } else if (error.message.includes('Session expired')) {
+              toast.error('Session expired. Please log in again.');
+            } else {
+              toast.error(`Failed to save template: ${error.message}`);
+            }
+          } else {
+            toast.error('Failed to save template');
+          }
     } finally {
       console.log('🏁 Save process finished, setting saving to false');
       clearTimeout(saveTimeout);
@@ -380,10 +396,10 @@ export default function TemplateEditor() {
             <Button
               size="sm"
               onClick={handleSave}
-              disabled={saving || !backgroundUrl || !templateName.trim()}
+              disabled={saving || !backgroundUrl || !templateName.trim() || !canEditTemplate}
             >
               <Save className="mr-2 h-4 w-4" />
-              {saving ? 'Saving...' : 'Save'}
+              {saving ? 'Saving...' : !canEditTemplate ? 'Read Only' : 'Save'}
             </Button>
           </div>
         </div>
@@ -449,18 +465,18 @@ export default function TemplateEditor() {
               <EnhancedFrameToolbar
                 frames={frames}
                 selectedFrame={selectedFrame}
-                onAddFrame={handleAddFrame}
-                onDeleteFrame={handleDeleteFrame}
-                onDuplicateFrame={handleDuplicateFrame}
+                onAddFrame={canEditTemplate ? handleAddFrame : undefined}
+                onDeleteFrame={canEditTemplate ? handleDeleteFrame : undefined}
+                onDuplicateFrame={canEditTemplate ? handleDuplicateFrame : undefined}
               />
             )}
 
             {activePanel === 'properties' && selectedFrame && (
               <EnhancedPropertiesPanel
                 frame={selectedFrame}
-                onFrameUpdate={handleFrameUpdate}
-                onFrameDelete={handleDeleteFrame}
-                onFrameDuplicate={handleDuplicateFrame}
+                onFrameUpdate={canEditTemplate ? handleFrameUpdate : undefined}
+                onFrameDelete={canEditTemplate ? handleDeleteFrame : undefined}
+                onFrameDuplicate={canEditTemplate ? handleDuplicateFrame : undefined}
               />
             )}
           </div>
@@ -474,9 +490,10 @@ export default function TemplateEditor() {
             backgroundUrl={backgroundUrl}
             frames={frames}
             selectedFrameId={selectedFrameId}
-            onFramesChange={setFrames}
+            onFramesChange={canEditTemplate ? setFrames : undefined}
             onFrameSelect={setSelectedFrameId}
             onCanvasReady={setCanvasReady}
+            readOnly={!canEditTemplate}
           />
         </div>
       </div>
