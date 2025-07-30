@@ -464,10 +464,10 @@ export default function TemplateEditor() {
             {activePanel === 'frames' && (
               <EnhancedFrameToolbar
                 frames={frames}
-                selectedFrame={selectedFrame}
-                onAddFrame={canEditTemplate ? handleAddFrame : undefined}
-                onDeleteFrame={canEditTemplate ? handleDeleteFrame : undefined}
-                onDuplicateFrame={canEditTemplate ? handleDuplicateFrame : undefined}
+                selectedFrameId={selectedFrameId}
+                onFramesChange={canEditTemplate ? setFrames : undefined}
+                onFrameSelect={setSelectedFrameId}
+                canvasReady={canvasReady}
               />
             )}
 

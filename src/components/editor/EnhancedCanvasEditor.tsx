@@ -1,13 +1,15 @@
 /**
  * Enhanced Canvas Editor Component
- * Advanced HTML5 Canvas-based editor with resizable frames, complex shapes, and intuitive UX
+ * Intuitive and powerful HTML5 Canvas-based editor with seamless frame creation
  */
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { ZoomIn, ZoomOut, RotateCcw, Download, Move, Square, Circle, Type, Image as ImageIcon } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
+import { ZoomIn, ZoomOut, RotateCcw, Download, Move, Square, Circle, Type, Image as ImageIcon, Plus, Trash2, Grid3X3, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { drawBackgroundImage } from '@/lib/imageUtils';
 
 export interface FrameData {
   id: string;
@@ -18,8 +20,8 @@ export interface FrameData {
   height: number;
   rotation: number;
   shape: 'rectangle' | 'circle' | 'rounded-rectangle' | 'polygon';
-  cornerRadius?: number; // For rounded rectangles
-  points?: number[][]; // For polygons
+  cornerRadius?: number;
+  polygonSides?: number; // Number of sides for polygon (6 = hexagon, 8 = octagon, etc.)
   properties?: {
     fontSize?: number;
     fontFamily?: string;
@@ -44,17 +46,21 @@ interface DragState {
   isDragging: boolean;
   isResizing: boolean;
   isRotating: boolean;
+  isCreating: boolean;
   startX: number;
   startY: number;
   startFrame: FrameData | null;
   resizeHandle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' | null;
+  createType: 'image' | 'text' | null;
+  createShape: 'rectangle' | 'circle' | 'rounded-rectangle';
 }
 
 const RESIZE_HANDLE_SIZE = 8;
 const ROTATION_HANDLE_DISTANCE = 30;
 const SNAP_THRESHOLD = 10;
-const GRID_SIZE = 20; // Grid size for snapping
-const SNAP_DISTANCE = 10; // Distance for snapping to grid and other frames
+const GRID_SIZE = 10;
+const SNAP_DISTANCE = 10;
+const MIN_FRAME_SIZE = 30;
 
 export default function EnhancedCanvasEditor({
   backgroundUrl,
@@ -68,18 +74,24 @@ export default function EnhancedCanvasEditor({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [zoom, setZoom] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
     isResizing: false,
     isRotating: false,
+    isCreating: false,
     startX: 0,
     startY: 0,
     startFrame: null,
     resizeHandle: null,
+    createType: null,
+    createShape: 'rectangle',
   });
   const [snapLines, setSnapLines] = useState<{ x?: number; y?: number; type: 'horizontal' | 'vertical' }[]>([]);
+  const [showGrid, setShowGrid] = useState(true);
+  const [showGuides, setShowGuides] = useState(true);
+  const [fineGrid, setFineGrid] = useState(false);
 
   const selectedFrame = useMemo(() => 
     frames.find(f => f.id === selectedFrameId) || null, 
@@ -88,7 +100,8 @@ export default function EnhancedCanvasEditor({
 
   // Snap functions
   const snapToGrid = (value: number): number => {
-    return Math.round(value / GRID_SIZE) * GRID_SIZE;
+    const currentGridSize = fineGrid ? 5 : GRID_SIZE;
+    return Math.round(value / currentGridSize) * currentGridSize;
   };
 
   const snapToFrame = (x: number, y: number, excludeFrameId?: string): { x: number; y: number; snapLines: { x?: number; y?: number; type: 'horizontal' | 'vertical' }[] } => {
@@ -99,7 +112,6 @@ export default function EnhancedCanvasEditor({
     frames.forEach(frame => {
       if (frame.id === excludeFrameId) return;
       
-      // Snap to frame edges
       const frameLeft = frame.x;
       const frameRight = frame.x + frame.width;
       const frameTop = frame.y;
@@ -140,11 +152,9 @@ export default function EnhancedCanvasEditor({
   };
 
   const snapPosition = (x: number, y: number, excludeFrameId?: string): { x: number; y: number; snapLines: { x?: number; y?: number; type: 'horizontal' | 'vertical' }[] } => {
-    // First snap to grid
     let snappedX = snapToGrid(x);
     let snappedY = snapToGrid(y);
     
-    // Then snap to other frames
     const frameSnap = snapToFrame(snappedX, snappedY, excludeFrameId);
     
     return frameSnap;
@@ -158,9 +168,9 @@ export default function EnhancedCanvasEditor({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size - use standard aspect ratios
-    const width = 1200; // Standard flyer width
-    const height = 800; // Standard flyer height (3:2 ratio)
+    // Set canvas size - preserve aspect ratio of background
+    const width = 1200;
+    const height = 800;
     setCanvasSize({ width, height });
     canvas.width = width;
     canvas.height = height;
@@ -228,21 +238,20 @@ export default function EnhancedCanvasEditor({
     ctx.save();
     ctx.scale(zoom, zoom);
 
-    // Draw grid (only when zoomed in enough)
-    if (zoom > 0.5) {
-      ctx.strokeStyle = '#e5e7eb';
-      ctx.lineWidth = 1;
+    // Draw grid
+    if (showGrid && zoom > 0.5) {
+      const currentGridSize = fineGrid ? 5 : GRID_SIZE;
+      ctx.strokeStyle = fineGrid ? '#f3f4f6' : '#e5e7eb';
+      ctx.lineWidth = fineGrid ? 0.5 : 1;
       
-      // Vertical lines
-      for (let x = 0; x <= canvasSize.width; x += GRID_SIZE) {
+      for (let x = 0; x <= canvasSize.width; x += currentGridSize) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
         ctx.lineTo(x, canvasSize.height);
         ctx.stroke();
       }
       
-      // Horizontal lines
-      for (let y = 0; y <= canvasSize.height; y += GRID_SIZE) {
+      for (let y = 0; y <= canvasSize.height; y += currentGridSize) {
         ctx.beginPath();
         ctx.moveTo(0, y);
         ctx.lineTo(canvasSize.width, y);
@@ -250,28 +259,9 @@ export default function EnhancedCanvasEditor({
       }
     }
 
-    // Draw background with aspect ratio preservation
+    // Draw background
     if (backgroundImage) {
-      const imgAspectRatio = backgroundImage.width / backgroundImage.height;
-      const canvasAspectRatio = canvasSize.width / canvasSize.height;
-      
-      let drawWidth, drawHeight, drawX, drawY;
-      
-      if (imgAspectRatio > canvasAspectRatio) {
-        // Image is wider than canvas - fit to width
-        drawWidth = canvasSize.width;
-        drawHeight = canvasSize.width / imgAspectRatio;
-        drawX = 0;
-        drawY = (canvasSize.height - drawHeight) / 2;
-      } else {
-        // Image is taller than canvas - fit to height
-        drawHeight = canvasSize.height;
-        drawWidth = canvasSize.height * imgAspectRatio;
-        drawX = (canvasSize.width - drawWidth) / 2;
-        drawY = 0;
-      }
-      
-      ctx.drawImage(backgroundImage, drawX, drawY, drawWidth, drawHeight);
+      drawBackgroundImage(ctx, backgroundImage, canvasSize.width, canvasSize.height);
     } else {
       ctx.fillStyle = '#f8f9fa';
       ctx.fillRect(0, 0, canvasSize.width, canvasSize.height);
@@ -283,7 +273,7 @@ export default function EnhancedCanvasEditor({
     });
 
     // Draw snap lines
-    if (snapLines.length > 0) {
+    if (showGuides && snapLines.length > 0) {
       ctx.strokeStyle = '#3b82f6';
       ctx.lineWidth = 2;
       ctx.setLineDash([5, 5]);
@@ -304,7 +294,7 @@ export default function EnhancedCanvasEditor({
     }
 
     ctx.restore();
-  }, [frames, selectedFrameId, backgroundImage, canvasSize, zoom]);
+  }, [frames, selectedFrameId, backgroundImage, canvasSize, zoom, showGrid, showGuides, snapLines, fineGrid]);
 
   // Draw a single frame
   const drawFrame = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
@@ -452,24 +442,28 @@ export default function EnhancedCanvasEditor({
 
   // Draw polygon frame
   const drawPolygonFrame = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
-    const points = frame.points || [
-      [0, 0], [frame.width, 0], [frame.width, frame.height], [0, frame.height]
-    ];
+    const sides = frame.polygonSides || 6; // Default to hexagon
+    const centerX = frame.x + frame.width / 2;
+    const centerY = frame.y + frame.height / 2;
+    const radius = Math.min(frame.width, frame.height) / 2;
     
     ctx.strokeStyle = isSelected ? '#3b82f6' : '#6b7280';
     ctx.lineWidth = isSelected ? 2 : 1;
     ctx.setLineDash(isSelected ? [] : [5, 5]);
     
+    // Draw polygon
     ctx.beginPath();
-    points.forEach((point, index) => {
-      const x = frame.x + point[0];
-      const y = frame.y + point[1];
-      if (index === 0) {
+    for (let i = 0; i < sides; i++) {
+      const angle = (i * 2 * Math.PI) / sides - Math.PI / 2; // Start from top
+      const x = centerX + radius * Math.cos(angle);
+      const y = centerY + radius * Math.sin(angle);
+      
+      if (i === 0) {
         ctx.moveTo(x, y);
       } else {
         ctx.lineTo(x, y);
       }
-    });
+    }
     ctx.closePath();
     ctx.stroke();
 
@@ -480,8 +474,8 @@ export default function EnhancedCanvasEditor({
       ctx.textAlign = 'center';
       ctx.fillText(
         frame.properties?.placeholder || 'Text',
-        frame.x + frame.width / 2,
-        frame.y + frame.height / 2 + 5
+        centerX,
+        centerY + 5
       );
     } else {
       ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
@@ -490,21 +484,21 @@ export default function EnhancedCanvasEditor({
       ctx.fillStyle = '#6b7280';
       ctx.font = '16px Arial';
       ctx.textAlign = 'center';
-      ctx.fillText('📷', frame.x + frame.width / 2, frame.y + frame.height / 2 + 5);
+      ctx.fillText('📷', centerX, centerY + 5);
     }
   }, []);
 
   // Draw selection handles
   const drawSelectionHandles = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData) => {
     const handles = [
-      { x: frame.x, y: frame.y, cursor: 'nw-resize' }, // Top-left
-      { x: frame.x + frame.width / 2, y: frame.y, cursor: 'n-resize' }, // Top
-      { x: frame.x + frame.width, y: frame.y, cursor: 'ne-resize' }, // Top-right
-      { x: frame.x + frame.width, y: frame.y + frame.height / 2, cursor: 'e-resize' }, // Right
-      { x: frame.x + frame.width, y: frame.y + frame.height, cursor: 'se-resize' }, // Bottom-right
-      { x: frame.x + frame.width / 2, y: frame.y + frame.height, cursor: 's-resize' }, // Bottom
-      { x: frame.x, y: frame.y + frame.height, cursor: 'sw-resize' }, // Bottom-left
-      { x: frame.x, y: frame.y + frame.height / 2, cursor: 'w-resize' }, // Left
+      { x: frame.x, y: frame.y, cursor: 'nw-resize' },
+      { x: frame.x + frame.width / 2, y: frame.y, cursor: 'n-resize' },
+      { x: frame.x + frame.width, y: frame.y, cursor: 'ne-resize' },
+      { x: frame.x + frame.width, y: frame.y + frame.height / 2, cursor: 'e-resize' },
+      { x: frame.x + frame.width, y: frame.y + frame.height, cursor: 'se-resize' },
+      { x: frame.x + frame.width / 2, y: frame.y + frame.height, cursor: 's-resize' },
+      { x: frame.x, y: frame.y + frame.height, cursor: 'sw-resize' },
+      { x: frame.x, y: frame.y + frame.height / 2, cursor: 'w-resize' },
     ];
 
     handles.forEach(handle => {
@@ -551,7 +545,6 @@ export default function EnhancedCanvasEditor({
   }, [zoom]);
 
   const getFrameAtPosition = useCallback((x: number, y: number): FrameData | null => {
-    // Check frames in reverse order (top to bottom)
     for (let i = frames.length - 1; i >= 0; i--) {
       const frame = frames[i];
       if (x >= frame.x && x <= frame.x + frame.width &&
@@ -594,6 +587,8 @@ export default function EnhancedCanvasEditor({
   }, [selectedFrame]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (readOnly) return;
+    
     const { x, y } = getMousePos(e);
     const frame = getFrameAtPosition(x, y);
     
@@ -605,30 +600,39 @@ export default function EnhancedCanvasEditor({
           isDragging: false,
           isResizing: false,
           isRotating: true,
+          isCreating: false,
           startX: x,
           startY: y,
           startFrame: { ...frame },
           resizeHandle: null,
+          createType: null,
+          createShape: 'rectangle',
         });
       } else if (resizeHandle) {
         setDragState({
           isDragging: false,
           isResizing: true,
           isRotating: false,
+          isCreating: false,
           startX: x,
           startY: y,
           startFrame: { ...frame },
           resizeHandle: resizeHandle as any,
+          createType: null,
+          createShape: 'rectangle',
         });
       } else {
         setDragState({
           isDragging: true,
           isResizing: false,
           isRotating: false,
+          isCreating: false,
           startX: x,
           startY: y,
           startFrame: { ...frame },
           resizeHandle: null,
+          createType: null,
+          createShape: 'rectangle',
         });
       }
       
@@ -636,10 +640,10 @@ export default function EnhancedCanvasEditor({
     } else {
       onFrameSelect(null);
     }
-  }, [getMousePos, getFrameAtPosition, getResizeHandle, onFrameSelect]);
+  }, [getMousePos, getFrameAtPosition, getResizeHandle, onFrameSelect, readOnly]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragState.isDragging && !dragState.isResizing && !dragState.isRotating) {
+    if (!dragState.isDragging && !dragState.isResizing && !dragState.isRotating && !dragState.isCreating) {
       // Update cursor
       const { x, y } = getMousePos(e);
       const frame = getFrameAtPosition(x, y);
@@ -674,28 +678,26 @@ export default function EnhancedCanvasEditor({
         const newX = dragState.startFrame!.x + deltaX;
         const newY = dragState.startFrame!.y + deltaY;
         
-        // Apply snapping
         const snapped = snapPosition(newX, newY, f.id);
         newFrame.x = snapped.x;
         newFrame.y = snapped.y;
         
-        // Update snap lines for visual feedback
         setSnapLines(snapped.snapLines);
       } else if (dragState.isResizing) {
         const handle = dragState.resizeHandle;
         if (handle?.includes('e')) {
-          newFrame.width = Math.max(20, dragState.startFrame!.width + deltaX);
+          newFrame.width = Math.max(MIN_FRAME_SIZE, dragState.startFrame!.width + deltaX);
         }
         if (handle?.includes('w')) {
-          const newWidth = Math.max(20, dragState.startFrame!.width - deltaX);
+          const newWidth = Math.max(MIN_FRAME_SIZE, dragState.startFrame!.width - deltaX);
           newFrame.x = dragState.startFrame!.x + dragState.startFrame!.width - newWidth;
           newFrame.width = newWidth;
         }
         if (handle?.includes('s')) {
-          newFrame.height = Math.max(20, dragState.startFrame!.height + deltaY);
+          newFrame.height = Math.max(MIN_FRAME_SIZE, dragState.startFrame!.height + deltaY);
         }
         if (handle?.includes('n')) {
-          const newHeight = Math.max(20, dragState.startFrame!.height - deltaY);
+          const newHeight = Math.max(MIN_FRAME_SIZE, dragState.startFrame!.height - deltaY);
           newFrame.y = dragState.startFrame!.y + dragState.startFrame!.height - newHeight;
           newFrame.height = newHeight;
         }
@@ -709,7 +711,7 @@ export default function EnhancedCanvasEditor({
       return newFrame;
     });
 
-    onFramesChange(updatedFrames);
+    onFramesChange?.(updatedFrames);
   }, [dragState, getMousePos, frames, selectedFrameId, getFrameAtPosition, getResizeHandle, onFramesChange]);
 
   const handleMouseUp = useCallback(() => {
@@ -717,13 +719,57 @@ export default function EnhancedCanvasEditor({
       isDragging: false,
       isResizing: false,
       isRotating: false,
+      isCreating: false,
       startX: 0,
       startY: 0,
       startFrame: null,
       resizeHandle: null,
+      createType: null,
+      createShape: 'rectangle',
     });
-    setSnapLines([]); // Clear snap lines when dragging stops
+    setSnapLines([]);
   }, []);
+
+  // Quick frame creation
+  const createFrame = useCallback((type: 'image' | 'text', shape: 'rectangle' | 'circle' | 'rounded-rectangle' = 'rectangle') => {
+    if (!onFramesChange) return;
+
+    const newFrame: FrameData = {
+      id: `frame_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      type,
+      x: 100 + frames.length * 20,
+      y: 100 + frames.length * 20,
+      width: type === 'image' ? 200 : 300,
+      height: type === 'image' ? 200 : 80,
+      rotation: 0,
+      shape,
+      cornerRadius: shape === 'rounded-rectangle' ? 10 : undefined,
+      properties: type === 'text' ? {
+        fontSize: 24,
+        fontFamily: 'Arial',
+        color: '#000000',
+        textAlign: 'center',
+        placeholder: 'Enter your text here',
+      } : undefined,
+    };
+
+    const updatedFrames = [...frames, newFrame];
+    onFramesChange(updatedFrames);
+    onFrameSelect(newFrame.id);
+    
+    toast.success(`${type === 'image' ? 'Image' : 'Text'} frame created!`);
+  }, [frames, onFramesChange, onFrameSelect]);
+
+  // Delete selected frame
+  const deleteSelectedFrame = useCallback(() => {
+    if (!selectedFrame || !onFramesChange) return;
+
+    const updatedFrames = frames.filter(f => f.id !== selectedFrame.id);
+    onFramesChange(updatedFrames);
+    onFrameSelect(null);
+    
+    toast.success('Frame deleted');
+  }, [selectedFrame, frames, onFramesChange, onFrameSelect]);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -761,7 +807,7 @@ export default function EnhancedCanvasEditor({
         case 'Delete':
         case 'Backspace':
           e.preventDefault();
-          onFrameSelect(null);
+          deleteSelectedFrame();
           break;
         case 'r':
           if (e.ctrlKey || e.metaKey) {
@@ -777,7 +823,7 @@ export default function EnhancedCanvasEditor({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedFrame, onFrameSelect]);
+  }, [selectedFrame, onFrameSelect, readOnly]);
 
   const updateFrame = (updates: Partial<FrameData>) => {
     if (!selectedFrame || readOnly || !onFramesChange) return;
@@ -823,6 +869,39 @@ export default function EnhancedCanvasEditor({
       {readOnly && (
         <div className="absolute top-2 right-2 z-10 bg-yellow-100 border border-yellow-300 text-yellow-800 px-2 py-1 rounded text-xs font-medium">
           Read Only
+        </div>
+      )}
+      
+      {/* Quick Actions Toolbar */}
+      {!readOnly && (
+        <div className="absolute top-2 left-2 z-10 flex gap-2">
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => createFrame('image', 'rectangle')}
+            className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+          >
+            <ImageIcon className="h-4 w-4 mr-1" />
+            Add Image
+          </Button>
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={() => createFrame('text', 'rectangle')}
+            className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+          >
+            <Type className="h-4 w-4 mr-1" />
+            Add Text
+          </Button>
+          {selectedFrame && (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={deleteSelectedFrame}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       )}
       
@@ -877,11 +956,30 @@ export default function EnhancedCanvasEditor({
           >
             <RotateCcw className="h-4 w-4" />
           </Button>
+
+          <Separator orientation="vertical" className="h-6" />
+          
+          <Button
+            variant={showGrid ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowGrid(!showGrid)}
+          >
+            {showGrid ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+          </Button>
+          
+          <Button
+            variant={fineGrid ? "default" : "outline"}
+            size="sm"
+            onClick={() => setFineGrid(!fineGrid)}
+            disabled={!showGrid}
+          >
+            <Grid3X3 className="h-4 w-4" />
+          </Button>
         </div>
 
         <div className="flex items-center gap-2">
           <div className="text-xs text-gray-500">
-            <span className="hidden sm:inline">Arrow keys: Move • Ctrl+R: Rotate • Delete: Deselect</span>
+            <span className="hidden sm:inline">Arrow keys: Move • Ctrl+R: Rotate • Delete: Remove</span>
           </div>
           <Button
             variant="outline"

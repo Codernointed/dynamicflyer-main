@@ -1,27 +1,21 @@
 /**
  * Enhanced Frame Toolbar Component
- * Advanced toolbar for creating and managing frames with different shapes
+ * Simple and intuitive toolbar for creating and managing frames
  */
 
 import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import {
-  Square,
-  Circle,
-  Type,
-  Image as ImageIcon,
-  Plus,
-  RotateCw,
-  Move,
+import { 
+  Image as ImageIcon, 
+  Type, 
+  Square, 
+  Circle, 
   Trash2,
   Copy,
-  Layers,
-  Hexagon,
-  Star,
-  Heart
+  Layers
 } from 'lucide-react';
 
 // Custom RoundedSquare icon component
@@ -39,315 +33,307 @@ const RoundedSquare = ({ className, ...props }: any) => (
     <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
   </svg>
 );
+
+// Custom Hexagon icon component
+const Hexagon = ({ className, ...props }: any) => (
+  <svg
+    className={className}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M12 2L21 8.5V15.5L12 22L3 15.5V8.5L12 2Z" />
+  </svg>
+);
 import { FrameData } from './EnhancedCanvasEditor';
-import { toast } from 'sonner';
 
 interface EnhancedFrameToolbarProps {
-  onAddFrame: (frame: FrameData) => void;
-  onDeleteFrame: (frameId: string) => void;
-  onDuplicateFrame: (frame: FrameData) => void;
-  selectedFrame: FrameData | null;
   frames: FrameData[];
+  selectedFrameId: string | null;
+  onFramesChange: (frames: FrameData[]) => void;
+  onFrameSelect: (frameId: string | null) => void;
+  canvasReady: boolean;
 }
 
-const SHAPE_OPTIONS = [
-  { value: 'rectangle', label: 'Rectangle', icon: Square, description: 'Standard rectangular frame' },
-  { value: 'rounded-rectangle', label: 'Rounded Rectangle', icon: RoundedSquare, description: 'Rectangle with rounded corners' },
-  { value: 'circle', label: 'Circle', icon: Circle, description: 'Perfect circular frame' },
-  { value: 'polygon', label: 'Polygon', icon: Hexagon, description: 'Custom polygon shape' },
-];
-
-const POLYGON_PRESETS = [
-  { name: 'Triangle', points: [[0, 1], [1, 0], [1, 1]] },
-  { name: 'Diamond', points: [[0.5, 0], [1, 0.5], [0.5, 1], [0, 0.5]] },
-  { name: 'Hexagon', points: [[0.25, 0], [0.75, 0], [1, 0.5], [0.75, 1], [0.25, 1], [0, 0.5]] },
-  { name: 'Star', points: [[0.5, 0], [0.6, 0.4], [1, 0.4], [0.7, 0.6], [0.8, 1], [0.5, 0.8], [0.2, 1], [0.3, 0.6], [0, 0.4], [0.4, 0.4]] },
-];
-
 export default function EnhancedFrameToolbar({
-  onAddFrame,
-  onDeleteFrame,
-  onDuplicateFrame,
-  selectedFrame,
   frames,
+  selectedFrameId,
+  onFramesChange,
+  onFrameSelect,
+  canvasReady,
 }: EnhancedFrameToolbarProps) {
-  const [selectedShape, setSelectedShape] = useState<FrameData['shape']>('rectangle');
-  const [selectedType, setSelectedType] = useState<'image' | 'text'>('text');
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
-  const generateId = () => `frame_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const generateFrameId = () => {
+    return `frame_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  };
 
-  const createFrame = (shape: FrameData['shape'], type: 'image' | 'text') => {
-    const baseFrame: FrameData = {
-      id: generateId(),
+  const createFrame = (type: 'image' | 'text', shape: 'rectangle' | 'circle' | 'rounded-rectangle' | 'polygon' = 'rectangle', polygonSides?: number) => {
+    if (!canvasReady) return;
+
+    const newFrame: FrameData = {
+      id: generateFrameId(),
       type,
-      x: 100,
-      y: 100,
-      width: 150,
-      height: 100,
+      x: 100 + frames.length * 20,
+      y: 100 + frames.length * 20,
+      width: type === 'image' ? 200 : 300,
+      height: type === 'image' ? 200 : 80,
       rotation: 0,
       shape,
-      properties: {
-        fontSize: 16,
+      cornerRadius: shape === 'rounded-rectangle' ? 10 : undefined,
+      polygonSides: shape === 'polygon' ? (polygonSides || 6) : undefined,
+      properties: type === 'text' ? {
+        fontSize: 24,
         fontFamily: 'Arial',
         color: '#000000',
         textAlign: 'center',
-        placeholder: type === 'text' ? 'Enter text here' : 'Image placeholder',
-      },
+        placeholder: 'Enter your text here',
+      } : undefined,
     };
 
-    // Add shape-specific properties
-    if (shape === 'rounded-rectangle') {
-      baseFrame.cornerRadius = 10;
-    } else if (shape === 'polygon') {
-      baseFrame.points = POLYGON_PRESETS[0].points; // Default to triangle
-    }
-
-    onAddFrame(baseFrame);
-    toast.success(`${shape.charAt(0).toUpperCase() + shape.slice(1)} ${type} frame added`);
+    onFramesChange([...frames, newFrame]);
+    onFrameSelect(newFrame.id);
   };
 
-  const handleAddFrame = () => {
-    createFrame(selectedShape, selectedType);
-  };
-
-  const handleDeleteFrame = () => {
-    if (selectedFrame) {
-      onDeleteFrame(selectedFrame.id);
-      toast.success('Frame deleted');
+  const deleteFrame = (frameId: string) => {
+    const updatedFrames = frames.filter(frame => frame.id !== frameId);
+    onFramesChange(updatedFrames);
+    
+    if (selectedFrameId === frameId) {
+      onFrameSelect(null);
     }
   };
 
-  const handleDuplicateFrame = () => {
-    if (selectedFrame) {
-      const duplicatedFrame = {
-        ...selectedFrame,
-        id: generateId(),
-        x: selectedFrame.x + 20,
-        y: selectedFrame.y + 20,
-      };
-      onDuplicateFrame(duplicatedFrame);
-      toast.success('Frame duplicated');
-    }
+  const duplicateFrame = (frameId: string) => {
+    const frameToClone = frames.find(f => f.id === frameId);
+    if (!frameToClone) return;
+
+    const newFrame: FrameData = {
+      ...frameToClone,
+      id: generateFrameId(),
+      x: frameToClone.x + 20,
+      y: frameToClone.y + 20,
+    };
+
+    onFramesChange([...frames, newFrame]);
+    onFrameSelect(newFrame.id);
   };
 
-  const getShapeIcon = (shape: FrameData['shape']) => {
-    switch (shape) {
-      case 'circle': return Circle;
-      case 'rounded-rectangle': return RoundedSquare;
-      case 'polygon': return Hexagon;
-      default: return Square;
-    }
-  };
-
-  const getTypeIcon = (type: 'image' | 'text') => {
-    return type === 'text' ? Type : ImageIcon;
-  };
+  const selectedFrame = frames.find(f => f.id === selectedFrameId);
 
   return (
-    <Card className="w-80">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg flex items-center gap-2">
-          <Layers className="h-5 w-5" />
-          Frame Tools
-        </CardTitle>
-      </CardHeader>
-      
-      <CardContent className="space-y-4">
-        {/* Frame Creation */}
-        <div className="space-y-3">
-          <h3 className="text-sm font-medium text-gray-700">Create New Frame</h3>
+    <div className="space-y-4">
+      {/* Quick Add Section */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Layers className="h-4 w-4" />
+            Quick Add
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => createFrame('image', 'rectangle')}
+              disabled={!canvasReady}
+              className="h-auto py-3 flex flex-col items-center gap-2"
+            >
+              <ImageIcon className="h-5 w-5 text-blue-600" />
+              <span className="text-xs">Image Frame</span>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => createFrame('text', 'rectangle')}
+              disabled={!canvasReady}
+              className="h-auto py-3 flex flex-col items-center gap-2"
+            >
+              <Type className="h-5 w-5 text-green-600" />
+              <span className="text-xs">Text Frame</span>
+            </Button>
+          </div>
           
-          {/* Shape Selection */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-gray-600">Shape</label>
-            <div className="grid grid-cols-2 gap-2">
-              {SHAPE_OPTIONS.map((shape) => {
-                const Icon = shape.icon;
-                return (
-                  <Button
-                    key={shape.value}
-                    variant={selectedShape === shape.value ? 'default' : 'outline'}
-                    size="sm"
-                    className="h-12 flex-col gap-1"
-                    onClick={() => setSelectedShape(shape.value as FrameData['shape'])}
-                    title={shape.description}
-                  >
-                    <Icon className="h-4 w-4" />
-                    <span className="text-xs">{shape.label}</span>
-                  </Button>
-                );
-              })}
+          {showAdvanced && (
+            <div className="space-y-2">
+              <Separator />
+              <div className="text-xs text-gray-500 font-medium">Shapes</div>
+              <div className="grid grid-cols-4 gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => createFrame('image', 'circle')}
+                  disabled={!canvasReady}
+                  className="h-auto py-2 flex flex-col items-center gap-1"
+                >
+                  <Circle className="h-4 w-4" />
+                  <span className="text-xs">Circle</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => createFrame('image', 'rounded-rectangle')}
+                  disabled={!canvasReady}
+                  className="h-auto py-2 flex flex-col items-center gap-1"
+                >
+                  <RoundedSquare className="h-4 w-4" />
+                  <span className="text-xs">Rounded</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => createFrame('image', 'polygon', 6)}
+                  disabled={!canvasReady}
+                  className="h-auto py-2 flex flex-col items-center gap-1"
+                >
+                  <Hexagon className="h-4 w-4" />
+                  <span className="text-xs">Hexagon</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => createFrame('image', 'polygon', 8)}
+                  disabled={!canvasReady}
+                  className="h-auto py-2 flex flex-col items-center gap-1"
+                >
+                  <Hexagon className="h-4 w-4" />
+                  <span className="text-xs">Octagon</span>
+                </Button>
+              </div>
             </div>
-          </div>
-
-          {/* Type Selection */}
-          <div className="space-y-2">
-            <label className="text-xs font-medium text-gray-600">Type</label>
-            <div className="flex gap-2">
-              <Button
-                variant={selectedType === 'text' ? 'default' : 'outline'}
-                size="sm"
-                className="flex-1"
-                onClick={() => setSelectedType('text')}
-              >
-                <Type className="mr-2 h-4 w-4" />
-                Text
-              </Button>
-              <Button
-                variant={selectedType === 'image' ? 'default' : 'outline'}
-                size="sm"
-                className="flex-1"
-                onClick={() => setSelectedType('image')}
-              >
-                <ImageIcon className="mr-2 h-4 w-4" />
-                Image
-              </Button>
-            </div>
-          </div>
-
-          {/* Add Frame Button */}
+          )}
+          
           <Button
-            onClick={handleAddFrame}
-            className="w-full"
+            variant="ghost"
             size="sm"
+            onClick={() => setShowAdvanced(!showAdvanced)}
+            className="w-full text-xs"
           >
-            <Plus className="mr-2 h-4 w-4" />
-            Add Frame
+            {showAdvanced ? 'Hide' : 'Show'} Advanced Options
           </Button>
-        </div>
+        </CardContent>
+      </Card>
 
-        <Separator />
-
-        {/* Frame Management */}
-        <div className="space-y-3">
-          <h3 className="text-sm font-medium text-gray-700">Frame Management</h3>
-          
-          {selectedFrame ? (
-            <div className="space-y-3">
-              {/* Selected Frame Info */}
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-2 mb-2">
-                  {(() => {
-                    const ShapeIcon = getShapeIcon(selectedFrame.shape);
-                    const TypeIcon = getTypeIcon(selectedFrame.type);
-                    return (
-                      <>
-                        <ShapeIcon className="h-4 w-4 text-gray-600" />
-                        <TypeIcon className="h-4 w-4 text-gray-600" />
-                      </>
-                    );
-                  })()}
-                  <span className="text-sm font-medium">Selected Frame</span>
+      {/* Frame List */}
+      {frames.length > 0 && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">
+              Frames ({frames.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {frames.map((frame) => (
+              <div
+                key={frame.id}
+                className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${
+                  frame.id === selectedFrameId
+                    ? 'bg-blue-50 border-blue-200'
+                    : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                }`}
+                onClick={() => onFrameSelect(frame.id)}
+              >
+                <div className="flex items-center gap-2">
+                  {frame.type === 'image' ? (
+                    <ImageIcon className="h-4 w-4 text-blue-600" />
+                  ) : (
+                    <Type className="h-4 w-4 text-green-600" />
+                  )}
+                  <div className="text-xs">
+                    <div className="font-medium">
+                      {frame.type === 'image' ? 'Image' : 'Text'} Frame
+                    </div>
+                    <div className="text-gray-500">
+                      {frame.shape} • {frame.width}×{frame.height}
+                    </div>
+                  </div>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
-                  <div>Position: {Math.round(selectedFrame.x)}, {Math.round(selectedFrame.y)}</div>
-                  <div>Size: {Math.round(selectedFrame.width)} × {Math.round(selectedFrame.height)}</div>
-                  <div>Rotation: {Math.round(selectedFrame.rotation)}°</div>
-                  <div>Shape: {selectedFrame.shape}</div>
-                </div>
-              </div>
-
-              {/* Frame Actions */}
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDuplicateFrame}
-                >
-                  <Copy className="mr-2 h-4 w-4" />
-                  Duplicate
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDeleteFrame}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-4 text-gray-500">
-              <Move className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-              <p className="text-sm">Select a frame to manage</p>
-            </div>
-          )}
-        </div>
-
-        <Separator />
-
-        {/* Frame List */}
-        <div className="space-y-2">
-          <h3 className="text-sm font-medium text-gray-700">All Frames ({frames.length})</h3>
-          
-          <div className="space-y-1 max-h-32 overflow-y-auto">
-            {frames.map((frame) => {
-              const ShapeIcon = getShapeIcon(frame.shape);
-              const TypeIcon = getTypeIcon(frame.type);
-              
-              return (
-                <div
-                  key={frame.id}
-                  className={`flex items-center gap-2 p-2 rounded cursor-pointer transition-colors ${
-                    selectedFrame?.id === frame.id
-                      ? 'bg-blue-50 border border-blue-200'
-                      : 'hover:bg-gray-50'
-                  }`}
-                  onClick={() => {
-                    // This would need to be passed down from parent
-                    // For now, just show a toast
-                    toast.info(`Frame ${frame.id} selected`);
-                  }}
-                >
-                  <ShapeIcon className="h-3 w-3 text-gray-500" />
-                  <TypeIcon className="h-3 w-3 text-gray-500" />
-                  <span className="text-xs text-gray-700 flex-1 truncate">
-                    {frame.properties?.placeholder || `${frame.shape} ${frame.type}`}
-                  </span>
-                  <Badge variant="secondary" className="text-xs">
-                    {frame.id.slice(-4)}
-                  </Badge>
-                </div>
-              );
-            })}
-          </div>
-          
-          {frames.length === 0 && (
-            <div className="text-center py-4 text-gray-500">
-              <p className="text-sm">No frames created yet</p>
-            </div>
-          )}
-        </div>
-
-        {/* Polygon Presets (when polygon is selected) */}
-        {selectedShape === 'polygon' && (
-          <>
-            <Separator />
-            <div className="space-y-2">
-              <h3 className="text-sm font-medium text-gray-700">Polygon Presets</h3>
-              <div className="grid grid-cols-2 gap-2">
-                {POLYGON_PRESETS.map((preset, index) => (
+                <div className="flex items-center gap-1">
                   <Button
-                    key={preset.name}
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    className="h-10 text-xs"
-                    onClick={() => {
-                      setSelectedShape('polygon');
-                      toast.info(`${preset.name} preset selected`);
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      duplicateFrame(frame.id);
                     }}
+                    className="h-6 w-6 p-0"
                   >
-                    {preset.name}
+                    <Copy className="h-3 w-3" />
                   </Button>
-                ))}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteFrame(frame.id);
+                    }}
+                    className="h-6 w-6 p-0 text-red-600 hover:text-red-700"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
               </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Frame Guidelines */}
+      {frames.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm font-medium">Frame Guidelines</CardTitle>
+          </CardHeader>
+          <CardContent className="text-xs text-gray-600 space-y-1">
+            <p>• <span className="text-blue-600">Blue frames</span> = Image upload areas</p>
+            <p>• <span className="text-green-600">Green frames</span> = Text input areas</p>
+            <p>• Users will see only the frames, not the background</p>
+            <p>• Make frames large enough for content</p>
+            <p>• Click and drag to move frames</p>
+            <p>• Use handles to resize frames</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Empty State */}
+      {frames.length === 0 && (
+        <Card>
+          <CardContent className="text-center py-8">
+            <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+              <Layers className="h-6 w-6 text-gray-400" />
             </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
+            <h3 className="text-sm font-medium text-gray-900 mb-1">No frames yet</h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Add image and text frames to create editable areas
+            </p>
+            <div className="flex gap-2 justify-center">
+              <Button
+                size="sm"
+                onClick={() => createFrame('image', 'rectangle')}
+                disabled={!canvasReady}
+              >
+                <ImageIcon className="h-4 w-4 mr-1" />
+                Add Image Frame
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => createFrame('text', 'rectangle')}
+                disabled={!canvasReady}
+              >
+                <Type className="h-4 w-4 mr-1" />
+                Add Text Frame
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 } 

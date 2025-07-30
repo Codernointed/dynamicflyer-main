@@ -33,6 +33,7 @@ import { Template, TemplateWithFrames } from '@/integrations/supabase/types';
 import { uploadImage } from '@/lib/supabase';
 import { exportCanvasToPDF, getPDFExportOptions } from '@/lib/pdfUtils';
 import { getAvailableFonts, applyFontToContext } from '@/lib/fontUtils';
+import { drawBackgroundImage, loadImage, cropImageToFrame, createCroppedCanvas } from '@/lib/imageUtils';
 
 interface FrameData {
   id: string;
@@ -43,8 +44,8 @@ interface FrameData {
   height: number;
   rotation: number;
   shape: 'rectangle' | 'circle' | 'rounded-rectangle' | 'polygon';
-  cornerRadius?: number; // For rounded rectangles
-  points?: number[][]; // For polygons
+  cornerRadius?: number;
+  polygonSides?: number;
   properties?: {
     fontSize?: number;
     fontFamily?: string;
@@ -59,7 +60,7 @@ interface UserData {
   [frameId: string]: {
     type: 'image' | 'text';
     value: string | File;
-    uploadedUrl?: string; // Cached upload URL
+    uploadedUrl?: string;
   };
 }
 
@@ -85,117 +86,80 @@ export default function PublicGenerator() {
 
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
   const [availableFonts, setAvailableFonts] = useState<string[]>([]);
 
-  // Shape drawing helper functions
+    // Shape drawing helper functions
   const createShapePath = (ctx: CanvasRenderingContext2D, frame: FrameData) => {
     ctx.beginPath();
     
     switch (frame.shape) {
-      case 'circle':
+      case 'circle': {
         const centerX = frame.x + frame.width / 2;
         const centerY = frame.y + frame.height / 2;
         const radius = Math.min(frame.width, frame.height) / 2;
         ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
         break;
-        
-      case 'rounded-rectangle':
+      }
+      case 'rounded-rectangle': {
         const cornerRadius = frame.cornerRadius || 10;
-        ctx.roundRect(frame.x, frame.y, frame.width, frame.height, cornerRadius);
+        ctx.moveTo(frame.x + cornerRadius, frame.y);
+        ctx.lineTo(frame.x + frame.width - cornerRadius, frame.y);
+        ctx.quadraticCurveTo(frame.x + frame.width, frame.y, frame.x + frame.width, frame.y + cornerRadius);
+        ctx.lineTo(frame.x + frame.width, frame.y + frame.height - cornerRadius);
+        ctx.quadraticCurveTo(frame.x + frame.width, frame.y + frame.height, frame.x + frame.width - cornerRadius, frame.y + frame.height);
+        ctx.lineTo(frame.x + cornerRadius, frame.y + frame.height);
+        ctx.quadraticCurveTo(frame.x, frame.y + frame.height, frame.x, frame.y + frame.height - cornerRadius);
+        ctx.lineTo(frame.x, frame.y + cornerRadius);
+        ctx.quadraticCurveTo(frame.x, frame.y, frame.x + cornerRadius, frame.y);
         break;
+      }
+      case 'polygon': {
+        const sides = frame.polygonSides || 6;
+        const centerX = frame.x + frame.width / 2;
+        const centerY = frame.y + frame.height / 2;
+        const radius = Math.min(frame.width, frame.height) / 2;
         
-      case 'polygon':
-        if (frame.points && frame.points.length > 0) {
-          ctx.moveTo(frame.x + frame.points[0][0], frame.y + frame.points[0][1]);
-          for (let i = 1; i < frame.points.length; i++) {
-            ctx.lineTo(frame.x + frame.points[i][0], frame.y + frame.points[i][1]);
+        for (let i = 0; i < sides; i++) {
+          const angle = (i * 2 * Math.PI) / sides - Math.PI / 2;
+          const x = centerX + radius * Math.cos(angle);
+          const y = centerY + radius * Math.sin(angle);
+          
+          if (i === 0) {
+            ctx.moveTo(x, y);
+          } else {
+            ctx.lineTo(x, y);
           }
-          ctx.closePath();
-        } else {
-          // Fallback to rectangle
-          ctx.rect(frame.x, frame.y, frame.width, frame.height);
         }
         break;
-        
-      default: // rectangle
+      }
+      default:
         ctx.rect(frame.x, frame.y, frame.width, frame.height);
-        break;
     }
   };
 
-  // Load template data and fonts
+  // Load template data
   useEffect(() => {
-    // Load available fonts
-    const fonts = getAvailableFonts();
-    setAvailableFonts(fonts);
-  }, []);
-
-  // Load template data with refresh capability
-  useEffect(() => {
-    if (!templateId) {
-      setError('Template ID is required');
-      setLoading(false);
-      return;
-    }
-
     const loadTemplate = async (retryCount = 0) => {
+      if (!templateId) return;
+
       try {
         setLoading(true);
         setError(null);
-        console.log('Loading template with ID:', templateId, `(attempt ${retryCount + 1})`);
-        
-        // Add timeout to prevent infinite loading (increased to 30 seconds)
-        const timeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout - please check your internet connection and try again')), 30000)
-        );
-        
-        // Add cache-busting parameter to ensure we get the latest template data
-        const templateData = await Promise.race([
-          getPublicTemplate(templateId),
-          timeoutPromise
-        ]) as TemplateWithFrames | null;
-        console.log('Template data received:', templateData);
+
+        console.log('Loading template:', templateId);
+        const templateData = await getPublicTemplate(templateId);
         
         if (!templateData) {
-          setError('Template not found or not public');
-          return;
+          throw new Error('Template not found');
         }
 
         setTemplate(templateData);
         setBackgroundUrl(templateData.background_url || '');
         
         if (templateData.frames && Array.isArray(templateData.frames)) {
-          // Convert Frame[] to FrameData[] - handle both typed and raw JSON frames
-          const frameDataArray: FrameData[] = templateData.frames.map(frame => {
-            // Handle frames that might be stored as raw JSON with additional properties
-            const rawFrame = frame as any;
-            
-
-            
-            return {
-              id: frame.id,
-              type: frame.type,
-              x: frame.x,
-              y: frame.y,
-              width: frame.width,
-              height: frame.height,
-              rotation: frame.rotation || 0,
-              shape: rawFrame.shape || 'rectangle',
-              cornerRadius: rawFrame.cornerRadius,
-              points: rawFrame.points,
-              properties: frame.type === 'text' ? {
-                fontSize: rawFrame.properties?.fontSize || rawFrame.fontSize || 24,
-                fontFamily: rawFrame.properties?.fontFamily || rawFrame.fontFamily || 'Arial',
-                color: rawFrame.properties?.color || rawFrame.color || '#000000',
-                textAlign: rawFrame.properties?.textAlign || rawFrame.textAlign || 'center',
-                placeholder: rawFrame.properties?.placeholder || rawFrame.placeholder || ''
-              } : undefined
-            };
-          });
-          setFrames(frameDataArray);
+          setFrames(templateData.frames as FrameData[]);
           console.log('Frames loaded:', templateData.frames.length);
-          console.log('Sample frame data:', frameDataArray[0]); // Debug: show first frame
         } else {
           console.log('No frames found in template');
           setFrames([]);
@@ -210,7 +174,6 @@ export default function PublicGenerator() {
       } catch (err) {
         console.error('Error loading template:', err);
         
-        // Retry logic for network errors
         if (retryCount < 2 && (err instanceof Error && 
             (err.message.includes('timeout') || err.message.includes('network') || err.message.includes('fetch')))) {
           console.log(`Retrying... (${retryCount + 1}/2)`);
@@ -241,54 +204,32 @@ export default function PublicGenerator() {
       return;
     }
 
-    // Set canvas size - match the editor dimensions
-    const width = 1200; // Match editor width
-    const height = 800; // Match editor height
+    // Set canvas size - preserve original template dimensions
+    const width = 1200;
+    const height = 800;
     setCanvasSize({ width, height });
     canvas.width = width;
     canvas.height = height;
 
-    console.log('Canvas initialized');
+    console.log('Canvas initialized with dimensions:', { width, height });
   }, []);
 
-  // Render canvas with user data
-  const renderCanvas = useCallback(async () => {
+  // Render canvas content to a given context (for export)
+  const renderCanvasToContext = useCallback(async (ctx: CanvasRenderingContext2D, width: number, height: number) => {
     try {
-      console.log('renderCanvas called with:', { backgroundUrl, framesCount: frames.length, userDataCount: Object.keys(userData).length });
-      
-      const canvas = canvasRef.current;
-      const ctx = canvas?.getContext('2d');
-      if (!canvas || !ctx || !backgroundUrl) {
-        console.log('renderCanvas early return:', { hasCanvas: !!canvas, hasCtx: !!ctx, hasBackgroundUrl: !!backgroundUrl });
+      if (!backgroundUrl) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, width, height);
         return;
       }
 
     // Clear canvas
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillRect(0, 0, width, height);
 
-    // Load and draw background image
-    const bgImage = new Image();
-    bgImage.crossOrigin = 'anonymous';
-    
-    await new Promise<void>((resolve, reject) => {
-      bgImage.onload = () => {
-        // Scale image to fit canvas
-        const scaleX = canvas.width / bgImage.width;
-        const scaleY = canvas.height / bgImage.height;
-        const scale = Math.min(scaleX, scaleY);
-
-        const scaledWidth = bgImage.width * scale;
-        const scaledHeight = bgImage.height * scale;
-        const x = (canvas.width - scaledWidth) / 2;
-        const y = (canvas.height - scaledHeight) / 2;
-
-        ctx.drawImage(bgImage, x, y, scaledWidth, scaledHeight);
-        resolve();
-      };
-      bgImage.onerror = reject;
-      bgImage.src = backgroundUrl;
-    });
+        // Load and draw background image
+    const bgImage = await loadImage(backgroundUrl);
+    drawBackgroundImage(ctx, bgImage, width, height);
 
     // Draw user data in frames
     for (const frame of frames) {
@@ -297,61 +238,34 @@ export default function PublicGenerator() {
 
       if (frame.type === 'image' && userInput.type === 'image') {
         // Draw user image
-        const userImage = new Image();
-        userImage.crossOrigin = 'anonymous';
+        const imageSrc = userInput.uploadedUrl || userInput.value;
+        const userImage = await loadImage(typeof imageSrc === 'string' ? imageSrc : URL.createObjectURL(imageSrc as File));
         
-        await new Promise<void>((resolve, reject) => {
-          userImage.onload = () => {
-            // Calculate aspect ratio and crop
-            const frameAspect = frame.width / frame.height;
-            const imageAspect = userImage.width / userImage.height;
-            
-            let drawWidth = frame.width;
-            let drawHeight = frame.height;
-            let sourceX = 0;
-            let sourceY = 0;
-            let sourceWidth = userImage.width;
-            let sourceHeight = userImage.height;
+        // Calculate aspect ratio and crop using utility function
+        const cropData = cropImageToFrame(userImage, frame.width, frame.height);
 
-            if (imageAspect > frameAspect) {
-              // Image is wider, crop sides
-              sourceWidth = userImage.height * frameAspect;
-              sourceX = (userImage.width - sourceWidth) / 2;
-            } else {
-              // Image is taller, crop top/bottom
-              sourceHeight = userImage.width / frameAspect;
-              sourceY = (userImage.height - sourceHeight) / 2;
-            }
-
-            // Apply rotation and shape clipping
-            ctx.save();
-            
-            // Move to frame center for rotation
-            const centerX = frame.x + frame.width / 2;
-            const centerY = frame.y + frame.height / 2;
-            ctx.translate(centerX, centerY);
-            ctx.rotate((frame.rotation || 0) * Math.PI / 180);
-            ctx.translate(-centerX, -centerY);
-            
-            // Create clipping path for shape
-            createShapePath(ctx, frame);
-            ctx.clip();
-            
-            // Draw the image
-            ctx.drawImage(
-              userImage,
-              sourceX, sourceY, sourceWidth, sourceHeight,
-              frame.x, frame.y, drawWidth, drawHeight
-            );
-            
-            ctx.restore();
-            resolve();
-          };
-          userImage.onerror = reject;
-          // Use cached URL if available, otherwise use the value directly
-          const imageSrc = userInput.uploadedUrl || userInput.value;
-          userImage.src = typeof imageSrc === 'string' ? imageSrc : URL.createObjectURL(imageSrc as File);
-        });
+        // Apply rotation and shape clipping
+        ctx.save();
+        
+        // Move to frame center for rotation
+        const centerX = frame.x + frame.width / 2;
+        const centerY = frame.y + frame.height / 2;
+        ctx.translate(centerX, centerY);
+        ctx.rotate((frame.rotation || 0) * Math.PI / 180);
+        ctx.translate(-centerX, -centerY);
+        
+        // Create clipping path for shape
+        createShapePath(ctx, frame);
+        ctx.clip();
+        
+        // Draw the image
+        ctx.drawImage(
+          userImage,
+          cropData.sourceX, cropData.sourceY, cropData.sourceWidth, cropData.sourceHeight,
+          frame.x, frame.y, cropData.drawWidth, cropData.drawHeight
+        );
+        
+        ctx.restore();
 
       } else if (frame.type === 'text' && userInput.type === 'text') {
         // Draw user text
@@ -361,8 +275,6 @@ export default function PublicGenerator() {
         const properties = frame.properties || {};
         const fontFamily = properties.fontFamily || 'Arial';
         const fontSize = properties.fontSize || 24;
-        
-
         
         // Apply rotation and shape clipping
         ctx.save();
@@ -382,8 +294,6 @@ export default function PublicGenerator() {
         applyFontToContext(ctx, fontFamily, fontSize);
         ctx.fillStyle = properties.color || '#000000';
         ctx.textAlign = (properties.textAlign as CanvasTextAlign) || 'center';
-        
-
 
         // Calculate text position
         const textX = frame.x + frame.width / 2;
@@ -415,10 +325,25 @@ export default function PublicGenerator() {
         ctx.restore();
       }
     }
+    } catch (error) {
+      console.error('Error rendering canvas to context:', error);
+    }
+  }, [backgroundUrl, frames, userData, createShapePath, applyFontToContext]);
+
+  // Render canvas with user data
+  const renderCanvas = useCallback(async () => {
+    try {
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (!canvas || !ctx || !backgroundUrl) {
+        return;
+      }
+
+      await renderCanvasToContext(ctx, canvas.width, canvas.height);
   } catch (error) {
     console.error('Error rendering canvas:', error);
   }
-}, [backgroundUrl, frames, userData]);
+  }, [renderCanvasToContext, backgroundUrl]);
 
   // Initialize canvas on mount
   useEffect(() => {
@@ -437,10 +362,8 @@ export default function PublicGenerator() {
   // Handle file upload with caching
   const handleFileUpload = async (frameId: string, file: File) => {
     try {
-      // Create a local preview URL immediately
       const previewUrl = URL.createObjectURL(file);
       
-      // Update UI immediately with preview
       setUserData(prev => ({
         ...prev,
         [frameId]: {
@@ -450,7 +373,7 @@ export default function PublicGenerator() {
         }
       }));
 
-      toast.success('Image added successfully! (Will upload when you save/download)');
+      toast.success('Image added successfully!');
     } catch (error) {
       console.error('Error handling image:', error);
       toast.error('Failed to add image');
@@ -480,7 +403,6 @@ export default function PublicGenerator() {
       for (const [frameId, userInput] of Object.entries(userData)) {
         if (userInput.type === 'image' && userInput.value instanceof File && !userInput.uploadedUrl?.startsWith('http')) {
           try {
-            console.log('Uploading cached image for frame:', frameId);
             const imageUrl = await uploadImage(userInput.value, 'user-uploads');
             updatedUserData[frameId] = {
               ...userInput,
@@ -497,7 +419,30 @@ export default function PublicGenerator() {
       await renderCanvas();
 
       const canvas = canvasRef.current;
-      const dataURL = canvas.toDataURL('image/png', 1.0);
+      
+      // Create a high-resolution export canvas
+      const exportCanvas = document.createElement('canvas');
+      const exportCtx = exportCanvas.getContext('2d');
+      if (!exportCtx) throw new Error('Failed to get export canvas context');
+      
+      // Set export canvas to high resolution (2x for better quality)
+      const scale = 2;
+      exportCanvas.width = canvas.width * scale;
+      exportCanvas.height = canvas.height * scale;
+      
+      // Scale the context to match the export size
+      exportCtx.scale(scale, scale);
+      
+      // Re-render the content to the export canvas
+      await renderCanvasToContext(exportCtx, exportCanvas.width / scale, exportCanvas.height / scale);
+      
+      // Load background image for cropping
+      const bgImage = await loadImage(backgroundUrl);
+      
+      // Create cropped canvas to remove white space
+      const croppedCanvas = createCroppedCanvas(exportCanvas, bgImage);
+      
+      const dataURL = croppedCanvas.toDataURL('image/png', 1.0);
       
       const link = document.createElement('a');
       link.download = `${template?.name || 'flyer'}-personalized.png`;
@@ -525,7 +470,6 @@ export default function PublicGenerator() {
       for (const [frameId, userInput] of Object.entries(userData)) {
         if (userInput.type === 'image' && userInput.value instanceof File && !userInput.uploadedUrl?.startsWith('http')) {
           try {
-            console.log('Uploading cached image for frame:', frameId);
             const imageUrl = await uploadImage(userInput.value, 'user-uploads');
             updatedUserData[frameId] = {
               ...userInput,
@@ -568,17 +512,16 @@ export default function PublicGenerator() {
       await navigator.clipboard.writeText(shareLink);
       setCopied(true);
       toast.success('Share link copied to clipboard!');
-      
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
+      console.error('Failed to copy link:', error);
       toast.error('Failed to copy link');
     }
   };
 
   // Generate QR code
   const handleGenerateQR = () => {
-    // For now, just show a placeholder
-    toast.info('QR code generation coming soon!');
+    setShowFullPreview(true);
   };
 
   // Reset form
@@ -587,25 +530,21 @@ export default function PublicGenerator() {
     toast.success('Form reset successfully!');
   };
 
-  // Refresh template data
+  // Refresh template
   const handleRefresh = () => {
     setLastRefresh(Date.now());
-    toast.success('Refreshing template...');
+    toast.success('Template refreshed!');
   };
 
-  // Save personalized template
+  // Save progress
   const handleSave = async () => {
-    if (!template?.id) return;
-
-    setGenerating(true);
     try {
-      // Upload any cached images first
+      // Upload any cached images
       const updatedUserData = { ...userData };
       
       for (const [frameId, userInput] of Object.entries(userData)) {
         if (userInput.type === 'image' && userInput.value instanceof File && !userInput.uploadedUrl?.startsWith('http')) {
           try {
-            console.log('Uploading cached image for frame:', frameId);
             const imageUrl = await uploadImage(userInput.value, 'user-uploads');
             updatedUserData[frameId] = {
               ...userInput,
@@ -613,51 +552,38 @@ export default function PublicGenerator() {
             };
           } catch (error) {
             console.error('Failed to upload image for frame:', frameId, error);
-            toast.error('Failed to upload some images');
           }
         }
       }
 
-      // Re-render canvas to ensure latest data
-      await renderCanvas();
-
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const dataURL = canvas.toDataURL('image/png', 1.0);
-      
-      // Create a personalized template record
-      const personalizedData = {
-        original_template_id: template.id,
-        user_data: updatedUserData,
-        generated_image_url: dataURL,
-        created_at: new Date().toISOString()
-      };
-
-      // For now, just show success message
-      // In a full implementation, you'd save this to the database
-      toast.success('Personalized template saved!');
-      
-      // You could also trigger a download here
-      const link = document.createElement('a');
-      link.download = `${template.name}-personalized.png`;
-      link.href = dataURL;
-      link.click();
-
+      setUserData(updatedUserData);
+      toast.success('Progress saved!');
     } catch (error) {
-      console.error('Error saving personalized template:', error);
-      toast.error('Failed to save template');
-    } finally {
-      setGenerating(false);
+      console.error('Error saving progress:', error);
+      toast.error('Failed to save progress');
     }
   };
 
+  // Load available fonts
+  useEffect(() => {
+    const loadFonts = async () => {
+      try {
+        const fonts = await getAvailableFonts();
+        setAvailableFonts(fonts);
+    } catch (error) {
+        console.error('Error loading fonts:', error);
+    }
+  };
+    loadFonts();
+  }, []);
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading template...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <h2 className="text-xl font-semibold text-gray-700">Loading template...</h2>
+          <p className="text-gray-500 mt-2">Please wait while we prepare your flyer</p>
         </div>
       </div>
     );
@@ -665,16 +591,30 @@ export default function PublicGenerator() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center max-w-md">
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-100 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-6">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
             </svg>
           </div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Template Not Found</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <Button onClick={() => navigate('/')}>
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">Template Not Found</h2>
+          <p className="text-gray-500 mb-6">{error}</p>
+          <Button onClick={() => navigate('/')} variant="outline">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Go Home
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!template) {
+  return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-700">No template found</h2>
+          <Button onClick={() => navigate('/')} variant="outline" className="mt-4">
             <ArrowLeft className="mr-2 h-4 w-4" />
             Go Home
           </Button>
@@ -684,28 +624,25 @@ export default function PublicGenerator() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
         {/* Header */}
-      <header className="sticky top-0 z-40 border-b bg-white shadow-sm">
-        <div className="flex h-16 items-center justify-between px-6">
-          <div className="flex items-center gap-4">
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => navigate('/')}
+                className="mr-4"
             >
-              <ArrowLeft className="mr-2 h-4 w-4" />
+                <ArrowLeft className="h-4 w-4 mr-2" />
               Back
             </Button>
-            
-            <Separator orientation="vertical" className="h-6" />
-            
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-semibold">
-                {template?.name || 'Personalize Template'}
-          </h1>
-              {template?.template_type && (
-                <Badge variant="secondary">{template.template_type}</Badge>
+              <div>
+                <h1 className="text-lg font-semibold text-gray-900">{template.name}</h1>
+                {template.description && (
+                  <p className="text-sm text-gray-500">{template.description}</p>
               )}
             </div>
           </div>
@@ -714,294 +651,254 @@ export default function PublicGenerator() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setPreviewMode(!previewMode)}
+                onClick={handleRefresh}
             >
-              <Eye className="mr-2 h-4 w-4" />
-              {previewMode ? 'Edit' : 'Preview'}
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
             </Button>
-            
             <Button
               variant="outline"
               size="sm"
-              onClick={() => setShowFullPreview(true)}
+                onClick={handleCopyLink}
             >
-              <Eye className="mr-2 h-4 w-4" />
-              Full Preview
+                {copied ? (
+                  <>
+                    <Check className="h-4 w-4 mr-2" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy Link
+                  </>
+                )}
             </Button>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReset}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Reset
-            </Button>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={loading}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </Button>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleSave}
-              disabled={generating}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {generating ? 'Saving...' : 'Save'}
-            </Button>
-            
-            <Button
-              size="sm"
-              onClick={handleDownload}
-              disabled={generating}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              {generating ? 'Generating...' : 'Download'}
-            </Button>
+            </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      <div className="flex h-[calc(100vh-4rem)]">
-        {/* Left Panel - User Inputs */}
-        {!previewMode && (
-          <div className="w-80 border-r bg-white overflow-y-auto">
-            <div className="p-6">
-              <div className="mb-6">
-                <h2 className="text-lg font-semibold mb-2">Personalize Your Template</h2>
-                <p className="text-sm text-gray-600">
-                  Fill in your information to create a personalized version
-                </p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Preview Area */}
+          <div className="lg:col-span-2">
+            <Card className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-semibold text-gray-900">Preview</h2>
+                <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+                    onClick={() => setPreviewMode(!previewMode)}
+            >
+                    <Eye className="h-4 w-4 mr-2" />
+                    {previewMode ? 'Edit Mode' : 'Preview Mode'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+                    onClick={handleGenerateQR}
+            >
+                    <QrCode className="h-4 w-4 mr-2" />
+                    QR Code
+            </Button>
+                </div>
+              </div>
+              
+              <div className="relative bg-gray-100 rounded-lg overflow-hidden">
+                <canvas
+                  ref={canvasRef}
+                  className="w-full h-auto max-h-[600px] object-contain"
+                  style={{ 
+                    width: '100%', 
+                    height: 'auto',
+                    maxWidth: '100%',
+                    display: 'block'
+                  }}
+                />
+                
+                {previewMode && (
+                  <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                    <div className="text-center text-white">
+                      <Eye className="h-12 w-12 mx-auto mb-4 opacity-75" />
+                      <p className="text-lg font-medium">Preview Mode</p>
+                      <p className="text-sm opacity-75">Click "Edit Mode" to make changes</p>
+          </div>
+        </div>
+                )}
+              </div>
+            </Card>
               </div>
 
+          {/* Form Area */}
               <div className="space-y-6">
-                {frames.map((frame) => (
-                  <Card key={frame.id}>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-sm flex items-center gap-2">
-                        {frame.type === 'image' ? (
-                          <ImageIcon className="h-4 w-4 text-blue-600" />
-                        ) : (
-                          <Type className="h-4 w-4 text-orange-600" />
-                        )}
-                        {frame.type === 'image' ? 'Upload Image' : 'Enter Text'}
-                      </CardTitle>
+            <Card className="p-6">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-lg">Personalize Your Flyer</CardTitle>
               </CardHeader>
-                    <CardContent className="space-y-3">
+              <CardContent className="space-y-6">
+                {frames.map((frame) => (
+                  <div key={frame.id} className="space-y-3">
+                    <Label className="text-sm font-medium text-gray-700">
+                        {frame.type === 'image' ? 'Upload Image' : 'Enter Text'}
+                      {frame.properties?.placeholder && (
+                        <span className="text-gray-500 ml-2">({frame.properties.placeholder})</span>
+                      )}
+                    </Label>
+                    
                       {frame.type === 'image' ? (
                         <div className="space-y-2">
-                          <Label htmlFor={`file-${frame.id}`}>Choose Image</Label>
-                          <Input
-                            id={`file-${frame.id}`}
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const input = document.createElement('input');
+                              input.type = 'file';
+                              input.accept = 'image/*';
+                              input.onchange = (e) => {
+                                const file = (e.target as HTMLInputElement).files?.[0];
                               if (file) {
                                 handleFileUpload(frame.id, file);
                               }
+                              };
+                              input.click();
                             }}
-                          />
+                            disabled={previewMode}
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Choose Image
+                          </Button>
                           {userData[frame.id]?.type === 'image' && (
-                            <div className="mt-2">
-                              <img
-                                src={userData[frame.id].value as string}
-                                alt="Uploaded"
-                                className="w-full h-24 object-cover rounded border"
-                              />
+                            <Badge variant="secondary" className="text-xs">
+                              Image Added
+                            </Badge>
+                          )}
+                        </div>
+                        {userData[frame.id]?.type === 'image' && (
+                          <div className="text-xs text-gray-500">
+                            ✓ Image uploaded successfully
                             </div>
                           )}
                         </div>
                       ) : (
-                        <div className="space-y-2">
-                          <Label htmlFor={`text-${frame.id}`}>
-                            {frame.properties?.placeholder || 'Enter text'}
-                          </Label>
                           <Input
-                            id={`text-${frame.id}`}
+                        type="text"
                             placeholder={frame.properties?.placeholder || 'Enter your text here'}
-                            value={(userData[frame.id]?.value as string) || ''}
+                        value={userData[frame.id]?.type === 'text' ? (userData[frame.id].value as string) : ''}
                             onChange={(e) => handleTextInput(frame.id, e.target.value)}
-                          />
-                          <div className="text-xs text-gray-500">
-                            Font: {frame.properties?.fontFamily || 'Arial'} • 
-                            Size: {frame.properties?.fontSize || 24}px • 
-                            Color: {frame.properties?.color || '#000000'}
-                          </div>
-                        </div>
+                        disabled={previewMode}
+                        className="w-full"
+                      />
                       )}
-                    </CardContent>
-                  </Card>
-                ))}
               </div>
+                ))}
 
               {frames.length === 0 && (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Personalization Areas</h3>
-                  <p className="text-sm text-gray-500">
-                    This template doesn't have any areas for personalization yet.
-                  </p>
+                  <div className="text-center py-8 text-gray-500">
+                    <Type className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No editable areas found in this template</p>
                 </div>
               )}
-            </div>
-          </div>
-        )}
-
-        {/* Main Canvas Area */}
-        <div className="flex-1 p-6 bg-gray-100 min-h-0">
-          <div className="h-full flex flex-col">
-            {/* Canvas Controls */}
-            <div className="flex items-center justify-between mb-4 flex-shrink-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-600">
-                  {canvasSize.width} × {canvasSize.height}
-                </span>
-                {previewMode && (
-                  <Badge variant="secondary">Preview Mode</Badge>
-                )}
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleCopyLink}
-                >
-                  {copied ? (
-                    <Check className="mr-2 h-4 w-4" />
-                  ) : (
-                    <Copy className="mr-2 h-4 w-4" />
-                  )}
-                  {copied ? 'Copied!' : 'Copy Link'}
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleGenerateQR}
-                >
-                  <QrCode className="mr-2 h-4 w-4" />
-                  QR Code
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDownload}
-                  disabled={generating}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  {generating ? 'Generating...' : 'PNG'}
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleExportPDF}
-                  disabled={generating}
-                >
-                  <FileText className="mr-2 h-4 w-4" />
-                  {generating ? 'Generating...' : 'PDF'}
-                </Button>
-              </div>
-            </div>
-
-            {/* Canvas Container */}
-            <Card className="flex-1 p-4 bg-gray-50 overflow-hidden">
-              <div className="relative h-full">
-                <div className="flex justify-center items-center h-full">
-                  <canvas
-                    ref={canvasRef}
-                    className="border-2 border-gray-300 rounded-lg shadow-lg bg-white max-w-full max-h-full"
-                    width={canvasSize.width}
-                    height={canvasSize.height}
-                    style={{ 
-                      width: canvasSize.width, 
-                      height: canvasSize.height,
-                      maxWidth: '100%',
-                      maxHeight: '100%',
-                      display: 'block',
-                      backgroundColor: '#ffffff'
-                    }}
-                  />
-                </div>
-
-                {frames.length === 0 && (
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="text-center text-gray-500 max-w-md bg-white/90 backdrop-blur-sm rounded-lg p-6 border">
-                      <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Personalization Areas</h3>
-                      <p className="text-sm text-gray-500">
-                        This template doesn't have any areas for personalization yet.
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </div>
+              </CardContent>
             </Card>
 
-            {/* Help Text */}
-            <div className="mt-4 text-xs text-gray-500 text-center space-y-1">
-              <p>Fill in your information on the left to personalize your template</p>
-              <p>Click PNG or PDF to download your personalized version</p>
-            </div>
+            {/* Action Buttons */}
+            <Card className="p-6">
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                <Button
+                    onClick={handleSave}
+                  variant="outline"
+                    className="flex-1"
+                    disabled={previewMode}
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Progress
+                </Button>
+                <Button
+                    onClick={handleReset}
+                  variant="outline"
+                    disabled={previewMode}
+                >
+                    Reset
+                </Button>
+                </div>
+                
+                <Separator />
+                
+                <div className="space-y-3">
+                <Button
+                  onClick={handleDownload}
+                    disabled={generating || previewMode}
+                    className="w-full"
+                    size="lg"
+                  >
+                    {generating ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="h-4 w-4 mr-2" />
+                        Download PNG
+                      </>
+                    )}
+                </Button>
+                
+                <Button
+                  onClick={handleExportPDF}
+                    variant="outline"
+                    disabled={generating || previewMode}
+                    className="w-full"
+                  >
+                    {generating ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                        Generating PDF...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="h-4 w-4 mr-2" />
+                        Export PDF
+                      </>
+                    )}
+                </Button>
+              </div>
+              </div>
+            </Card>
                 </div>
         </div>
       </div>
 
       {/* Full Preview Modal */}
       {showFullPreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-auto">
-            <div className="flex items-center justify-between mb-4">
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto">
+            <div className="p-6 border-b">
+              <div className="flex items-center justify-between">
               <h3 className="text-lg font-semibold">Full Preview</h3>
               <Button
-                variant="outline"
+                  variant="ghost"
                 size="sm"
                 onClick={() => setShowFullPreview(false)}
               >
-                Close
+                  ×
               </Button>
             </div>
-            <div className="flex justify-center">
+            </div>
+            <div className="p-6">
               <canvas
                 ref={canvasRef}
-                className="border rounded-lg shadow-lg"
-                width={canvasSize.width}
-                height={canvasSize.height}
+                className="w-full h-auto"
                 style={{ 
                   width: '100%',
-                  maxWidth: '600px',
                   height: 'auto',
-                  backgroundColor: '#ffffff'
+                  maxWidth: '100%',
+                  display: 'block'
                 }}
               />
-            </div>
-            <div className="mt-4 flex justify-center gap-2">
-              <Button onClick={handleDownload} disabled={generating}>
-                <Download className="mr-2 h-4 w-4" />
-                {generating ? 'Generating...' : 'Download'}
-              </Button>
-              <Button variant="outline" onClick={() => setShowFullPreview(false)}>
-                Close
-              </Button>
             </div>
           </div>
         </div>
