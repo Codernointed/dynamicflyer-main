@@ -92,11 +92,21 @@ export default function EnhancedCanvasEditor({
   const [showGrid, setShowGrid] = useState(true);
   const [showGuides, setShowGuides] = useState(true);
   const [fineGrid, setFineGrid] = useState(false);
+  const [rotationInput, setRotationInput] = useState<string>('');
 
   const selectedFrame = useMemo(() => 
     frames.find(f => f.id === selectedFrameId) || null, 
     [frames, selectedFrameId]
   );
+
+  // Update rotation input when selected frame changes
+  useEffect(() => {
+    if (selectedFrame) {
+      setRotationInput(selectedFrame.rotation.toString());
+    } else {
+      setRotationInput('');
+    }
+  }, [selectedFrame]);
 
   // Snap functions
   const snapToGrid = (value: number): number => {
@@ -300,68 +310,124 @@ export default function EnhancedCanvasEditor({
   const drawFrame = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
     ctx.save();
     
-    // Apply rotation
+    // Calculate the rotated bounding box to ensure no spaces
     const centerX = frame.x + frame.width / 2;
     const centerY = frame.y + frame.height / 2;
+    const rotationRad = (frame.rotation * Math.PI) / 180;
+    
+    // Calculate the corners of the original rectangle
+    const corners = [
+      { x: frame.x, y: frame.y },
+      { x: frame.x + frame.width, y: frame.y },
+      { x: frame.x + frame.width, y: frame.y + frame.height },
+      { x: frame.x, y: frame.y + frame.height }
+    ];
+    
+    // Rotate the corners
+    const rotatedCorners = corners.map(corner => {
+      const dx = corner.x - centerX;
+      const dy = corner.y - centerY;
+      return {
+        x: centerX + dx * Math.cos(rotationRad) - dy * Math.sin(rotationRad),
+        y: centerY + dx * Math.sin(rotationRad) + dy * Math.cos(rotationRad)
+      };
+    });
+    
+    // Find the bounding box of the rotated rectangle
+    const minX = Math.min(...rotatedCorners.map(c => c.x));
+    const maxX = Math.max(...rotatedCorners.map(c => c.x));
+    const minY = Math.min(...rotatedCorners.map(c => c.y));
+    const maxY = Math.max(...rotatedCorners.map(c => c.y));
+    
+    // Create a clipping path for the rotated frame
+    ctx.beginPath();
+    rotatedCorners.forEach((corner, index) => {
+      if (index === 0) {
+        ctx.moveTo(corner.x, corner.y);
+      } else {
+        ctx.lineTo(corner.x, corner.y);
+      }
+    });
+    ctx.closePath();
+    ctx.clip();
+    
+    // Draw the content (image/text) WITHOUT rotation - always upright
+    if (frame.type === 'text') {
+      drawTextContent(ctx, frame, isSelected);
+    } else {
+      drawImageContent(ctx, frame, isSelected);
+    }
+    
+    ctx.restore();
+    
+    // Draw the rotated frame border
+    ctx.save();
     ctx.translate(centerX, centerY);
-    ctx.rotate((frame.rotation * Math.PI) / 180);
+    ctx.rotate(rotationRad);
     ctx.translate(-centerX, -centerY);
-
-    // Draw frame based on shape
+    
+    // Draw frame border based on shape
     switch (frame.shape) {
       case 'circle':
-        drawCircleFrame(ctx, frame, isSelected);
+        drawCircleFrameBorder(ctx, frame, isSelected);
         break;
       case 'rounded-rectangle':
-        drawRoundedRectFrame(ctx, frame, isSelected);
+        drawRoundedRectFrameBorder(ctx, frame, isSelected);
         break;
       case 'polygon':
-        drawPolygonFrame(ctx, frame, isSelected);
+        drawPolygonFrameBorder(ctx, frame, isSelected);
         break;
       default:
-        drawRectangleFrame(ctx, frame, isSelected);
+        drawRectangleFrameBorder(ctx, frame, isSelected);
     }
-
-    // Draw selection handles
+    
+    ctx.restore();
+    
+    // Draw selection handles (also rotated)
     if (isSelected) {
       drawSelectionHandles(ctx, frame);
     }
-
-    ctx.restore();
   }, []);
 
-  // Draw rectangle frame
-  const drawRectangleFrame = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
+  // Draw text content (always upright)
+  const drawTextContent = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
+    // The content is already clipped to the rotated frame bounds
+    // Just draw the text in the center of the original frame coordinates
+    ctx.fillStyle = '#9ca3af';
+    ctx.font = `${frame.properties?.fontSize || 16}px ${frame.properties?.fontFamily || 'Arial'}`;
+    ctx.textAlign = 'center';
+    ctx.fillText(
+      frame.properties?.placeholder || 'Text placeholder',
+      frame.x + frame.width / 2,
+      frame.y + frame.height / 2 + 5
+    );
+  }, []);
+
+  // Draw image content (always upright)
+  const drawImageContent = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
+    // The content is already clipped to the rotated frame bounds
+    // Fill the entire frame area and draw the icon in the center
+    ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
+    ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
+    
+    // Draw image icon
+    ctx.fillStyle = '#6b7280';
+    ctx.font = '16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('📷', frame.x + frame.width / 2, frame.y + frame.height / 2 + 5);
+  }, []);
+
+  // Draw rectangle frame border (rotated)
+  const drawRectangleFrameBorder = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
     ctx.strokeStyle = isSelected ? '#3b82f6' : '#6b7280';
     ctx.lineWidth = isSelected ? 2 : 1;
     ctx.setLineDash(isSelected ? [] : [5, 5]);
     
     ctx.strokeRect(frame.x, frame.y, frame.width, frame.height);
-    
-    // Draw placeholder content
-    if (frame.type === 'text') {
-      ctx.fillStyle = '#9ca3af';
-      ctx.font = `${frame.properties?.fontSize || 16}px ${frame.properties?.fontFamily || 'Arial'}`;
-      ctx.textAlign = 'center';
-      ctx.fillText(
-        frame.properties?.placeholder || 'Text placeholder',
-        frame.x + frame.width / 2,
-        frame.y + frame.height / 2 + 5
-      );
-    } else {
-      ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
-      ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
-      
-      // Draw image icon
-      ctx.fillStyle = '#6b7280';
-      ctx.font = '16px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('📷', frame.x + frame.width / 2, frame.y + frame.height / 2 + 5);
-    }
   }, []);
 
-  // Draw circle frame
-  const drawCircleFrame = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
+  // Draw circle frame border (rotated)
+  const drawCircleFrameBorder = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
     const centerX = frame.x + frame.width / 2;
     const centerY = frame.y + frame.height / 2;
     const radius = Math.min(frame.width, frame.height) / 2;
@@ -373,32 +439,10 @@ export default function EnhancedCanvasEditor({
     ctx.beginPath();
     ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
     ctx.stroke();
-
-    // Draw placeholder content
-    if (frame.type === 'text') {
-      ctx.fillStyle = '#9ca3af';
-      ctx.font = `${frame.properties?.fontSize || 16}px ${frame.properties?.fontFamily || 'Arial'}`;
-      ctx.textAlign = 'center';
-      ctx.fillText(
-        frame.properties?.placeholder || 'Text',
-        centerX,
-        centerY + 5
-      );
-    } else {
-      ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
-      ctx.beginPath();
-      ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
-      ctx.fill();
-      
-      ctx.fillStyle = '#6b7280';
-      ctx.font = '16px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('📷', centerX, centerY + 5);
-    }
   }, []);
 
-  // Draw rounded rectangle frame
-  const drawRoundedRectFrame = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
+  // Draw rounded rectangle frame border (rotated)
+  const drawRoundedRectFrameBorder = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
     const radius = frame.cornerRadius || 10;
     
     ctx.strokeStyle = isSelected ? '#3b82f6' : '#6b7280';
@@ -418,30 +462,10 @@ export default function EnhancedCanvasEditor({
     ctx.quadraticCurveTo(frame.x, frame.y, frame.x + radius, frame.y);
     ctx.closePath();
     ctx.stroke();
-
-    // Draw placeholder content
-    if (frame.type === 'text') {
-      ctx.fillStyle = '#9ca3af';
-      ctx.font = `${frame.properties?.fontSize || 16}px ${frame.properties?.fontFamily || 'Arial'}`;
-      ctx.textAlign = 'center';
-      ctx.fillText(
-        frame.properties?.placeholder || 'Text placeholder',
-        frame.x + frame.width / 2,
-        frame.y + frame.height / 2 + 5
-      );
-    } else {
-      ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
-      ctx.fill();
-      
-      ctx.fillStyle = '#6b7280';
-      ctx.font = '16px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('📷', frame.x + frame.width / 2, frame.y + frame.height / 2 + 5);
-    }
   }, []);
 
-  // Draw polygon frame
-  const drawPolygonFrame = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
+  // Draw polygon frame border (rotated)
+  const drawPolygonFrameBorder = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
     const sides = frame.polygonSides || 6; // Default to hexagon
     const centerX = frame.x + frame.width / 2;
     const centerY = frame.y + frame.height / 2;
@@ -466,26 +490,6 @@ export default function EnhancedCanvasEditor({
     }
     ctx.closePath();
     ctx.stroke();
-
-    // Draw placeholder content
-    if (frame.type === 'text') {
-      ctx.fillStyle = '#9ca3af';
-      ctx.font = `${frame.properties?.fontSize || 16}px ${frame.properties?.fontFamily || 'Arial'}`;
-      ctx.textAlign = 'center';
-      ctx.fillText(
-        frame.properties?.placeholder || 'Text',
-        centerX,
-        centerY + 5
-      );
-    } else {
-      ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
-      ctx.fill();
-      
-      ctx.fillStyle = '#6b7280';
-      ctx.font = '16px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('📷', centerX, centerY + 5);
-    }
   }, []);
 
   // Draw selection handles
@@ -705,7 +709,12 @@ export default function EnhancedCanvasEditor({
         const centerX = dragState.startFrame!.x + dragState.startFrame!.width / 2;
         const centerY = dragState.startFrame!.y + dragState.startFrame!.height / 2;
         const angle = Math.atan2(y - centerY, x - centerX) * 180 / Math.PI;
-        newFrame.rotation = angle;
+        // Normalize angle to 0-360 range
+        let normalizedAngle = angle;
+        while (normalizedAngle < 0) normalizedAngle += 360;
+        while (normalizedAngle >= 360) normalizedAngle -= 360;
+        newFrame.rotation = normalizedAngle;
+        setRotationInput(normalizedAngle.toString());
       }
 
       return newFrame;
@@ -812,7 +821,24 @@ export default function EnhancedCanvasEditor({
         case 'r':
           if (e.ctrlKey || e.metaKey) {
             e.preventDefault();
-            updateFrame({ rotation: selectedFrame.rotation + rotationStep });
+            const newRotation = selectedFrame.rotation + rotationStep;
+            updateFrame({ rotation: newRotation });
+            setRotationInput(newRotation.toString());
+          }
+          break;
+        case 'R':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            const newRotation = selectedFrame.rotation - rotationStep;
+            updateFrame({ rotation: newRotation });
+            setRotationInput(newRotation.toString());
+          }
+          break;
+        case '0':
+          if (e.ctrlKey || e.metaKey) {
+            e.preventDefault();
+            updateFrame({ rotation: 0 });
+            setRotationInput('0');
           }
           break;
         case 'Escape':
@@ -861,6 +887,49 @@ export default function EnhancedCanvasEditor({
     link.download = 'template.png';
     link.href = canvas.toDataURL();
     link.click();
+  };
+
+  // Rotation controls
+  const handleRotationInputChange = (value: string) => {
+    setRotationInput(value);
+    const numValue = parseFloat(value);
+    if (!isNaN(numValue) && selectedFrame) {
+      updateFrame({ rotation: numValue });
+    }
+  };
+
+  const handleRotationInputBlur = () => {
+    if (selectedFrame) {
+      const numValue = parseFloat(rotationInput);
+      if (!isNaN(numValue)) {
+        updateFrame({ rotation: numValue });
+      } else {
+        setRotationInput(selectedFrame.rotation.toString());
+      }
+    }
+  };
+
+  const handleRotationUp = () => {
+    if (selectedFrame) {
+      const newRotation = selectedFrame.rotation + 5;
+      updateFrame({ rotation: newRotation });
+      setRotationInput(newRotation.toString());
+    }
+  };
+
+  const handleRotationDown = () => {
+    if (selectedFrame) {
+      const newRotation = selectedFrame.rotation - 5;
+      updateFrame({ rotation: newRotation });
+      setRotationInput(newRotation.toString());
+    }
+  };
+
+  const handleRotationReset = () => {
+    if (selectedFrame) {
+      updateFrame({ rotation: 0 });
+      setRotationInput('0');
+    }
   };
 
   return (
@@ -975,11 +1044,61 @@ export default function EnhancedCanvasEditor({
           >
             <Grid3X3 className="h-4 w-4" />
           </Button>
+
+          <Separator orientation="vertical" className="h-6" />
+          
+          {/* Rotation Controls */}
+          {selectedFrame && !readOnly && (
+            <div className="flex items-center gap-1">
+              <span className="text-xs text-gray-600 whitespace-nowrap">Rotation:</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRotationDown}
+                className="h-7 w-7 p-0"
+              >
+                ↓
+              </Button>
+              <input
+                type="number"
+                value={rotationInput}
+                onChange={(e) => handleRotationInputChange(e.target.value)}
+                onBlur={handleRotationInputBlur}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.currentTarget.blur();
+                  }
+                }}
+                className="w-16 h-7 text-center text-sm border border-gray-300 rounded px-1"
+                placeholder="0"
+                step="1"
+                min="-360"
+                max="360"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRotationUp}
+                className="h-7 w-7 p-0"
+              >
+                ↑
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRotationReset}
+                className="h-7 px-2 text-xs"
+                title="Reset rotation"
+              >
+                0°
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
           <div className="text-xs text-gray-500">
-            <span className="hidden sm:inline">Arrow keys: Move • Ctrl+R: Rotate • Delete: Remove</span>
+            <span className="hidden sm:inline">Arrow keys: Move • Ctrl+R: Rotate • Ctrl+Shift+R: Rotate CCW • Ctrl+0: Reset • Delete: Remove</span>
           </div>
           <Button
             variant="outline"

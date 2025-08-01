@@ -266,28 +266,31 @@ export default function PublicGenerator() {
           // Calculate aspect ratio and crop using utility function
           const cropData = cropImageToFrame(userImage, frame.width, frame.height);
 
-            // Apply rotation and shape clipping
-            ctx.save();
-            
-            // Move to frame center for rotation
-            const centerX = frame.x + frame.width / 2;
-            const centerY = frame.y + frame.height / 2;
-            ctx.translate(centerX, centerY);
-            ctx.rotate((frame.rotation || 0) * Math.PI / 180);
-            ctx.translate(-centerX, -centerY);
-            
-            // Create clipping path for shape
-            createShapePath(ctx, frame);
-            ctx.clip();
-            
-            // Draw the image
-            ctx.drawImage(
-              userImage,
+          // Draw image upright first, then apply rotated clipping
+          ctx.save();
+          
+          // Draw the image upright (no rotation)
+          ctx.drawImage(
+            userImage,
             cropData.sourceX, cropData.sourceY, cropData.sourceWidth, cropData.sourceHeight,
             frame.x, frame.y, cropData.drawWidth, cropData.drawHeight
-            );
-            
-            ctx.restore();
+          );
+          
+          // Now apply rotated clipping path
+          ctx.globalCompositeOperation = 'destination-in';
+          
+          // Move to frame center for rotation
+          const centerX = frame.x + frame.width / 2;
+          const centerY = frame.y + frame.height / 2;
+          ctx.translate(centerX, centerY);
+          ctx.rotate((frame.rotation || 0) * Math.PI / 180);
+          ctx.translate(-centerX, -centerY);
+          
+          // Create clipping path for shape (this will be rotated)
+          createShapePath(ctx, frame);
+          ctx.fill();
+          
+          ctx.restore();
         }
 
       } else if (frame.type === 'text' && userInput.type === 'text') {
@@ -299,19 +302,8 @@ export default function PublicGenerator() {
         const fontFamily = properties.fontFamily || 'Arial';
         const fontSize = properties.fontSize || 24;
         
-        // Apply rotation and shape clipping
+        // Draw text upright first, then apply rotated clipping
         ctx.save();
-        
-        // Move to frame center for rotation
-        const centerX = frame.x + frame.width / 2;
-        const centerY = frame.y + frame.height / 2;
-        ctx.translate(centerX, centerY);
-        ctx.rotate((frame.rotation || 0) * Math.PI / 180);
-        ctx.translate(-centerX, -centerY);
-        
-        // Create clipping path for shape
-        createShapePath(ctx, frame);
-        ctx.clip();
         
         // Apply custom font if available
         applyFontToContext(ctx, fontFamily, fontSize);
@@ -322,7 +314,7 @@ export default function PublicGenerator() {
         const textX = frame.x + frame.width / 2;
         const textY = frame.y + frame.height / 2 + (properties.fontSize || 24) / 3;
 
-        // Draw text with word wrapping
+        // Draw text with word wrapping (upright)
         const words = text.split(' ');
         const lineHeight = (properties.fontSize || 24) * 1.2;
         let currentLine = '';
@@ -344,6 +336,20 @@ export default function PublicGenerator() {
         if (currentLine) {
           ctx.fillText(currentLine, textX, currentY);
         }
+        
+        // Now apply rotated clipping path
+        ctx.globalCompositeOperation = 'destination-in';
+        
+        // Move to frame center for rotation
+        const centerX = frame.x + frame.width / 2;
+        const centerY = frame.y + frame.height / 2;
+        ctx.translate(centerX, centerY);
+        ctx.rotate((frame.rotation || 0) * Math.PI / 180);
+        ctx.translate(-centerX, -centerY);
+        
+        // Create clipping path for shape (this will be rotated)
+        createShapePath(ctx, frame);
+        ctx.fill();
         
         ctx.restore();
       }

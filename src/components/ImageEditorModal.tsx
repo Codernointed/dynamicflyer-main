@@ -405,24 +405,19 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
       tempCanvas.width = frame.width;
       tempCanvas.height = frame.height;
 
-      // Apply frame rotation first, then user transformations
+      // Only apply user transformations - NO frame rotation to image content
       const frameCenterX = frame.width / 2;
       const frameCenterY = frame.height / 2;
       
       tempCtx.save();
       
-      // Apply frame rotation from template
-      tempCtx.translate(frameCenterX, frameCenterY);
-      tempCtx.rotate((frame.rotation * Math.PI) / 180);
-      tempCtx.translate(-frameCenterX, -frameCenterY);
-      
-      // Apply user transformations on top of frame rotation
+      // Apply ONLY user transformations (no frame rotation)
       tempCtx.translate(frameCenterX, frameCenterY);
       tempCtx.rotate((transform.rotation * Math.PI) / 180);
       tempCtx.scale(transform.scale, transform.scale);
       tempCtx.translate(transform.x, transform.y);
 
-      // Draw image
+      // Draw image (always upright)
       tempCtx.drawImage(
         image,
         -image.width / 2,
@@ -437,7 +432,7 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
       tempCtx.globalCompositeOperation = 'destination-in';
       tempCtx.beginPath();
       
-      // Apply frame rotation for clipping
+      // Apply frame rotation ONLY for clipping (not for image content)
       tempCtx.save();
       tempCtx.translate(frameCenterX, frameCenterY);
       tempCtx.rotate((frame.rotation * Math.PI) / 180);
