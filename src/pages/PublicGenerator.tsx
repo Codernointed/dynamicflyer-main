@@ -19,7 +19,8 @@ import {
   QrCode,
   Save,
   RefreshCw,
-  FileText
+  FileText,
+  Edit
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -34,6 +35,7 @@ import { uploadImage } from '@/lib/supabase';
 import { exportCanvasToPDF, getPDFExportOptions } from '@/lib/pdfUtils';
 import { getAvailableFonts, applyFontToContext } from '@/lib/fontUtils';
 import { drawBackgroundImage, loadImage, cropImageToFrame, createCroppedCanvas } from '@/lib/imageUtils';
+import ImageEditorModal from '@/components/ImageEditorModal';
 
 interface FrameData {
   id: string;
@@ -61,6 +63,7 @@ interface UserData {
     type: 'image' | 'text';
     value: string | File;
     uploadedUrl?: string;
+    transformData?: any;
   };
 }
 
@@ -84,12 +87,17 @@ export default function PublicGenerator() {
   const [copied, setCopied] = useState(false);
   const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
 
+  // Image editor state
+  const [imageEditorOpen, setImageEditorOpen] = useState(false);
+  const [editingFrame, setEditingFrame] = useState<FrameData | null>(null);
+  const [editingImageFile, setEditingImageFile] = useState<File | null>(null);
+
   // Canvas refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
   const [availableFonts, setAvailableFonts] = useState<string[]>([]);
 
-    // Shape drawing helper functions
+  // Shape drawing helper functions
   const createShapePath = (ctx: CanvasRenderingContext2D, frame: FrameData) => {
     ctx.beginPath();
     
@@ -127,7 +135,7 @@ export default function PublicGenerator() {
           
           if (i === 0) {
             ctx.moveTo(x, y);
-          } else {
+        } else {
             ctx.lineTo(x, y);
           }
         }
@@ -227,7 +235,7 @@ export default function PublicGenerator() {
     ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, width, height);
 
-        // Load and draw background image
+    // Load and draw background image
     const bgImage = await loadImage(backgroundUrl);
     drawBackgroundImage(ctx, bgImage, width, height);
 
@@ -239,33 +247,48 @@ export default function PublicGenerator() {
       if (frame.type === 'image' && userInput.type === 'image') {
         // Draw user image
         const imageSrc = userInput.uploadedUrl || userInput.value;
-        const userImage = await loadImage(typeof imageSrc === 'string' ? imageSrc : URL.createObjectURL(imageSrc as File));
         
-        // Calculate aspect ratio and crop using utility function
-        const cropData = cropImageToFrame(userImage, frame.width, frame.height);
+        // Check if this is an edited image (data URL) or original file
+        if (typeof imageSrc === 'string' && imageSrc.startsWith('data:')) {
+          // This is an edited image that already includes frame rotation and user positioning
+          const userImage = await loadImage(imageSrc);
+          
+          // Draw the edited image directly - it's already perfect from the editor
+          // The edited image already includes frame rotation, so no need to apply it again
+          ctx.drawImage(
+            userImage,
+            frame.x, frame.y, frame.width, frame.height
+          );
+        } else {
+          // This is an original file that needs cropping
+          const userImage = await loadImage(typeof imageSrc === 'string' ? imageSrc : URL.createObjectURL(imageSrc as File));
+          
+          // Calculate aspect ratio and crop using utility function
+          const cropData = cropImageToFrame(userImage, frame.width, frame.height);
 
-        // Apply rotation and shape clipping
-        ctx.save();
-        
-        // Move to frame center for rotation
-        const centerX = frame.x + frame.width / 2;
-        const centerY = frame.y + frame.height / 2;
-        ctx.translate(centerX, centerY);
-        ctx.rotate((frame.rotation || 0) * Math.PI / 180);
-        ctx.translate(-centerX, -centerY);
-        
-        // Create clipping path for shape
-        createShapePath(ctx, frame);
-        ctx.clip();
-        
-        // Draw the image
-        ctx.drawImage(
-          userImage,
-          cropData.sourceX, cropData.sourceY, cropData.sourceWidth, cropData.sourceHeight,
-          frame.x, frame.y, cropData.drawWidth, cropData.drawHeight
-        );
-        
-        ctx.restore();
+            // Apply rotation and shape clipping
+            ctx.save();
+            
+            // Move to frame center for rotation
+            const centerX = frame.x + frame.width / 2;
+            const centerY = frame.y + frame.height / 2;
+            ctx.translate(centerX, centerY);
+            ctx.rotate((frame.rotation || 0) * Math.PI / 180);
+            ctx.translate(-centerX, -centerY);
+            
+            // Create clipping path for shape
+            createShapePath(ctx, frame);
+            ctx.clip();
+            
+            // Draw the image
+            ctx.drawImage(
+              userImage,
+            cropData.sourceX, cropData.sourceY, cropData.sourceWidth, cropData.sourceHeight,
+            frame.x, frame.y, cropData.drawWidth, cropData.drawHeight
+            );
+            
+            ctx.restore();
+        }
 
       } else if (frame.type === 'text' && userInput.type === 'text') {
         // Draw user text
@@ -359,25 +382,42 @@ export default function PublicGenerator() {
     }
   }, [backgroundUrl, frames, userData, renderCanvas]);
 
-  // Handle file upload with caching
+  // Handle file upload - open image editor
   const handleFileUpload = async (frameId: string, file: File) => {
     try {
-      const previewUrl = URL.createObjectURL(file);
-      
+      const frame = frames.find(f => f.id === frameId);
+      if (!frame) {
+        toast.error('Frame not found');
+        return;
+      }
+
+      setEditingFrame(frame);
+      setEditingImageFile(file);
+      setImageEditorOpen(true);
+    } catch (error) {
+      console.error('Error handling image:', error);
+      toast.error('Failed to open image editor');
+    }
+  };
+
+  // Handle image editor completion
+  const handleImageEditorComplete = (editedImageUrl: string, transformData: any) => {
+    if (!editingFrame) return;
+
       setUserData(prev => ({
         ...prev,
-        [frameId]: {
+      [editingFrame.id]: {
           type: 'image',
-          value: file,
-          uploadedUrl: previewUrl
+        value: editedImageUrl,
+        uploadedUrl: editedImageUrl,
+        transformData // Store transform data for potential re-editing
         }
       }));
 
-      toast.success('Image added successfully!');
-    } catch (error) {
-      console.error('Error handling image:', error);
-      toast.error('Failed to add image');
-    }
+    setImageEditorOpen(false);
+    setEditingFrame(null);
+    setEditingImageFile(null);
+    toast.success('Image edited and applied successfully!');
   };
 
   // Handle text input
@@ -770,9 +810,45 @@ export default function PublicGenerator() {
                             Choose Image
                           </Button>
                           {userData[frame.id]?.type === 'image' && (
-                            <Badge variant="secondary" className="text-xs">
-                              Image Added
-                            </Badge>
+                            <>
+                              <Badge variant="secondary" className="text-xs">
+                                Image Added
+                              </Badge>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  // Re-edit existing image
+                                  const existingData = userData[frame.id];
+                                  if (existingData?.type === 'image') {
+                                    // For re-editing, we need to convert data URL back to file
+                                    if (typeof existingData.value === 'string' && existingData.value.startsWith('data:')) {
+                                      // Convert data URL to file
+                                      fetch(existingData.value)
+                                        .then(res => res.blob())
+                                        .then(blob => {
+                                          const file = new File([blob], 'edited-image.png', { type: 'image/png' });
+                                          setEditingFrame(frame);
+                                          setEditingImageFile(file);
+                                          setImageEditorOpen(true);
+                                        })
+                                        .catch(err => {
+                                          console.error('Error converting data URL to file:', err);
+                                          toast.error('Failed to open image for editing');
+                                        });
+                                    } else if (existingData.value instanceof File) {
+                                      setEditingFrame(frame);
+                                      setEditingImageFile(existingData.value);
+                                      setImageEditorOpen(true);
+                                    }
+                                  }
+                                }}
+                                disabled={previewMode}
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit
+                              </Button>
+                            </>
                           )}
                         </div>
                         {userData[frame.id]?.type === 'image' && (
@@ -903,6 +979,19 @@ export default function PublicGenerator() {
           </div>
         </div>
       )}
+
+      {/* Image Editor Modal */}
+      <ImageEditorModal
+        open={imageEditorOpen}
+        onClose={() => {
+          setImageEditorOpen(false);
+          setEditingFrame(null);
+          setEditingImageFile(null);
+        }}
+        imageFile={editingImageFile}
+        frame={editingFrame!}
+        onApply={handleImageEditorComplete}
+      />
     </div>
   );
 } 

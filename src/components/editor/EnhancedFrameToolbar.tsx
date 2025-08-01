@@ -8,11 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { 
+import {
   Image as ImageIcon, 
   Type, 
-  Square, 
-  Circle, 
+  Square,
+  Circle,
   Trash2,
   Copy,
   Layers
@@ -117,7 +117,7 @@ export default function EnhancedFrameToolbar({
       id: generateFrameId(),
       x: frameToClone.x + 20,
       y: frameToClone.y + 20,
-    };
+      };
 
     onFramesChange([...frames, newFrame]);
     onFrameSelect(newFrame.id);
@@ -129,14 +129,14 @@ export default function EnhancedFrameToolbar({
     <div className="space-y-4">
       {/* Quick Add Section */}
       <Card>
-        <CardHeader className="pb-3">
+      <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Layers className="h-4 w-4" />
             Quick Add
-          </CardTitle>
-        </CardHeader>
+        </CardTitle>
+      </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -147,43 +147,43 @@ export default function EnhancedFrameToolbar({
               <ImageIcon className="h-5 w-5 text-blue-600" />
               <span className="text-xs">Image Frame</span>
             </Button>
-            <Button
+                  <Button
               variant="outline"
-              size="sm"
+                    size="sm"
               onClick={() => createFrame('text', 'rectangle')}
               disabled={!canvasReady}
               className="h-auto py-3 flex flex-col items-center gap-2"
-            >
+                  >
               <Type className="h-5 w-5 text-green-600" />
               <span className="text-xs">Text Frame</span>
-            </Button>
+                  </Button>
           </div>
-          
+
           {showAdvanced && (
-            <div className="space-y-2">
+          <div className="space-y-2">
               <Separator />
               <div className="text-xs text-gray-500 font-medium">Shapes</div>
               <div className="grid grid-cols-4 gap-2">
-                <Button
+              <Button
                   variant="ghost"
-                  size="sm"
+                size="sm"
                   onClick={() => createFrame('image', 'circle')}
                   disabled={!canvasReady}
                   className="h-auto py-2 flex flex-col items-center gap-1"
-                >
+              >
                   <Circle className="h-4 w-4" />
                   <span className="text-xs">Circle</span>
-                </Button>
-                <Button
+              </Button>
+              <Button
                   variant="ghost"
-                  size="sm"
+                size="sm"
                   onClick={() => createFrame('image', 'rounded-rectangle')}
                   disabled={!canvasReady}
                   className="h-auto py-2 flex flex-col items-center gap-1"
-                >
+          >
                   <RoundedSquare className="h-4 w-4" />
                   <span className="text-xs">Rounded</span>
-                </Button>
+          </Button>
                 <Button
                   variant="ghost"
                   size="sm"
@@ -219,7 +219,7 @@ export default function EnhancedFrameToolbar({
         </CardContent>
       </Card>
 
-      {/* Frame List */}
+        {/* Frame List */}
       {frames.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
@@ -229,13 +229,13 @@ export default function EnhancedFrameToolbar({
           </CardHeader>
           <CardContent className="space-y-2">
             {frames.map((frame) => (
-              <div
-                key={frame.id}
+                <div
+                  key={frame.id}
                 className={`flex items-center justify-between p-2 rounded-lg border cursor-pointer transition-colors ${
                   frame.id === selectedFrameId
                     ? 'bg-blue-50 border-blue-200'
                     : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
-                }`}
+                  }`}
                 onClick={() => onFrameSelect(frame.id)}
               >
                 <div className="flex items-center gap-2">
@@ -251,9 +251,9 @@ export default function EnhancedFrameToolbar({
                     <div className="text-gray-500">
                       {frame.shape} • {frame.width}×{frame.height}
                     </div>
-                  </div>
                 </div>
-                
+          </div>
+          
                 <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
@@ -331,8 +331,8 @@ export default function EnhancedFrameToolbar({
                 Add Text Frame
               </Button>
             </div>
-          </CardContent>
-        </Card>
+      </CardContent>
+    </Card>
       )}
     </div>
   );

@@ -11,11 +11,11 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { 
+import {
   Type, 
   Image as ImageIcon, 
-  Square, 
-  Circle, 
+  Square,
+  Circle,
   Trash2,
   Copy,
   RotateCw,
@@ -112,14 +112,14 @@ export default function EnhancedPropertiesPanel({
 
   return (
     <div className="space-y-4">
-      {/* Frame Info */}
+        {/* Frame Info */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             {frame.type === 'text' ? <Type className="h-4 w-4" /> : <ImageIcon className="h-4 w-4" />}
             {frame.type === 'image' ? 'Image' : 'Text'} Frame
           </CardTitle>
-        </CardHeader>
+      </CardHeader>
         <CardContent className="space-y-3">
           <div className="grid grid-cols-2 gap-2 text-xs">
             <div>
@@ -133,7 +133,7 @@ export default function EnhancedPropertiesPanel({
               <div className="font-mono">H: {Math.round(frame.height)}</div>
             </div>
           </div>
-          
+
           <div className="flex gap-2">
             <Button
               variant="outline"
@@ -156,7 +156,7 @@ export default function EnhancedPropertiesPanel({
         </CardContent>
       </Card>
 
-      {/* Shape Properties */}
+        {/* Shape Properties */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium">Shape</CardTitle>
@@ -246,7 +246,7 @@ export default function EnhancedPropertiesPanel({
               <RotateCw className="h-4 w-4 mr-1" />
               Reset Rotation
             </Button>
-          </div>
+        </div>
 
           {/* Polygon Sides (only for polygon shapes) */}
           {localFrame.shape === 'polygon' && (
@@ -292,8 +292,8 @@ export default function EnhancedPropertiesPanel({
         </CardContent>
       </Card>
 
-      {/* Text Properties (only for text frames) */}
-      {frame.type === 'text' && (
+        {/* Text Properties (only for text frames) */}
+        {frame.type === 'text' && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium">Text Properties</CardTitle>
@@ -311,29 +311,29 @@ export default function EnhancedPropertiesPanel({
               />
             </div>
 
-            <div className="space-y-2">
+              <div className="space-y-2">
               <Label className="text-xs text-gray-500">Font Family</Label>
-              <Select
+                <Select
                 value={localFrame.properties?.fontFamily || 'Arial'}
                 onValueChange={(value) => updateFrame({
                   properties: { ...localFrame.properties, fontFamily: value }
                 })}
-              >
+                >
                 <SelectTrigger className="h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
                   {FONT_FAMILIES.map((font) => (
-                    <SelectItem key={font} value={font}>
+                      <SelectItem key={font} value={font}>
                       {font}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
                 <Label className="text-xs text-gray-500">
                   Font Size: {localFrame.properties?.fontSize || 24}px
                 </Label>
@@ -361,32 +361,32 @@ export default function EnhancedPropertiesPanel({
                     <ChevronUp className="h-3 w-3" />
                   </Button>
                 </div>
-              </div>
-              <Slider
+                </div>
+                <Slider
                 value={[localFrame.properties?.fontSize || 24]}
                 onValueChange={([value]) => updateFrame({
                   properties: { ...localFrame.properties, fontSize: value }
                 })}
                 max={72}
-                min={8}
-                step={1}
+                  min={8}
+                  step={1}
                 className="w-full"
-              />
-            </div>
+                />
+              </div>
 
-            <div className="space-y-2">
+              <div className="space-y-2">
               <Label className="text-xs text-gray-500">Text Color</Label>
-              <Input
-                type="color"
+                  <Input
+                    type="color"
                 value={localFrame.properties?.color || '#000000'}
                 onChange={(e) => updateFrame({
                   properties: { ...localFrame.properties, color: e.target.value }
                 })}
                 className="h-8 w-full"
-              />
-            </div>
+                  />
+              </div>
 
-            <div className="space-y-2">
+              <div className="space-y-2">
               <Label className="text-xs text-gray-500">Text Alignment</Label>
               <Select
                 value={localFrame.properties?.textAlign || 'center'}
@@ -408,7 +408,7 @@ export default function EnhancedPropertiesPanel({
             </div>
           </CardContent>
         </Card>
-      )}
+        )}
 
       {/* Quick Actions */}
       <Card>
@@ -449,9 +449,9 @@ export default function EnhancedPropertiesPanel({
             >
               Reset Text Style
             </Button>
-          )}
-        </CardContent>
-      </Card>
+        )}
+      </CardContent>
+    </Card>
     </div>
   );
 } 
