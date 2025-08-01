@@ -35,7 +35,9 @@ export default function AuthLayout({
               transition={{ duration: 0.3 }}
               className="font-bold text-xl tracking-tight"
             >
-              Dynamic Flyer
+              <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+                Infinity Generation
+              </span>
             </motion.div>
           </Link>
 
@@ -65,19 +67,19 @@ export default function AuthLayout({
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 0.05, scale: 1 }}
           transition={{ duration: 2, ease: "easeOut" }}
-          className="absolute top-10 left-10 w-64 h-64 rounded-full bg-gradient-to-r from-primary to-secondary"
+          className="absolute top-10 left-10 w-64 h-64 rounded-full bg-gradient-to-r from-amber-400 to-yellow-500"
         />
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 0.03, scale: 1 }}
           transition={{ duration: 2, delay: 0.5, ease: "easeOut" }}
-          className="absolute bottom-10 right-10 w-96 h-96 rounded-full bg-gradient-to-r from-secondary to-primary"
+          className="absolute bottom-10 right-10 w-96 h-96 rounded-full bg-gradient-to-r from-yellow-500 to-amber-400"
         />
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 0.04, scale: 1 }}
           transition={{ duration: 2, delay: 1, ease: "easeOut" }}
-          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-gradient-to-r from-primary/50 to-secondary/50"
+          className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-gradient-to-r from-amber-400/50 to-yellow-500/50"
         />
       </div>
 
@@ -93,7 +95,7 @@ export default function AuthLayout({
             repeat: Infinity, 
             ease: "easeInOut" 
           }}
-          className="absolute top-20 right-20 w-3 h-3 rounded-full bg-primary/20"
+          className="absolute top-20 right-20 w-3 h-3 rounded-full bg-amber-400/20"
         />
         <motion.div
           animate={{ 
@@ -106,7 +108,7 @@ export default function AuthLayout({
             ease: "easeInOut",
             delay: 1 
           }}
-          className="absolute bottom-32 left-20 w-2 h-2 rounded-full bg-secondary/30"
+          className="absolute bottom-32 left-20 w-2 h-2 rounded-full bg-yellow-500/30"
         />
         <motion.div
           animate={{ 
@@ -119,13 +121,13 @@ export default function AuthLayout({
             ease: "easeInOut",
             delay: 2 
           }}
-          className="absolute top-40 left-1/3 w-1 h-1 rounded-full bg-primary/40"
+          className="absolute top-40 left-1/3 w-1 h-1 rounded-full bg-amber-400/40"
         />
       </div>
 
       {/* Footer */}
       <footer className="relative z-10 p-6 text-center text-sm text-muted-foreground">
-        <p>© {new Date().getFullYear()} Dynamic Flyer Platform. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} Infinity Generation. All rights reserved.</p>
       </footer>
     </div>
   );

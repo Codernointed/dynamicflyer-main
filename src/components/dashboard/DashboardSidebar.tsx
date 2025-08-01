@@ -53,7 +53,7 @@ export default function DashboardSidebar({ onClose }: DashboardSidebarProps) {
       {/* Header */}
       <div className="flex items-center justify-between p-6 border-b">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-purple-600">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-yellow-500">
             <Sparkles className="h-5 w-5 text-white" />
           </div>
           <div>
@@ -91,7 +91,7 @@ export default function DashboardSidebar({ onClose }: DashboardSidebarProps) {
                 className={({ isActive }) =>
                   `flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     isActive
-                      ? 'bg-blue-50 text-blue-700'
+                      ? 'bg-amber-50 text-amber-700'
                       : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                   }`
                 }
@@ -118,7 +118,7 @@ export default function DashboardSidebar({ onClose }: DashboardSidebarProps) {
                 className={({ isActive }) =>
                   `flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     isActive
-                      ? 'bg-blue-50 text-blue-700'
+                      ? 'bg-amber-50 text-amber-700'
                       : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                   }`
                 }
@@ -140,15 +140,15 @@ export default function DashboardSidebar({ onClose }: DashboardSidebarProps) {
 
       {/* Footer */}
       <div className="p-6 pt-4 border-t">
-        <div className="rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 p-4">
+        <div className="rounded-lg bg-gradient-to-r from-amber-50 to-yellow-50 p-4">
           <div className="flex items-center gap-2 mb-2">
-            <Award className="h-4 w-4 text-blue-600" />
+            <Award className="h-4 w-4 text-amber-600" />
             <span className="text-sm font-medium text-gray-900">Pro Features</span>
           </div>
           <p className="text-xs text-gray-600 mb-3">
             Unlock advanced templates, analytics, and unlimited exports.
           </p>
-          <Button size="sm" className="w-full">
+          <Button size="sm" className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white border-0">
             Upgrade to Pro
           </Button>
         </div>

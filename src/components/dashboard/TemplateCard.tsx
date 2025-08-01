@@ -198,7 +198,7 @@ export default function TemplateCard({
 
             {/* Template type badge */}
             <div className="absolute top-3 left-3">
-              <Badge variant="secondary" className="text-xs">
+              <Badge className="text-xs bg-gradient-to-r from-amber-400 to-yellow-500 text-white border-0">
                 <IconComponent className="mr-1 h-3 w-3" />
                 {typeLabel}
               </Badge>
@@ -287,11 +287,11 @@ export default function TemplateCard({
 
               {/* Quick actions */}
               <div className="flex gap-2 pt-2">
-                <Button variant="outline" size="sm" className="flex-1" onClick={handleEdit}>
+                <Button variant="outline" size="sm" className="flex-1 border-amber-200 text-amber-700 hover:bg-amber-50" onClick={handleEdit}>
                   <Edit3 className="mr-1 h-3 w-3" />
                   Edit
                 </Button>
-                <Button variant="outline" size="sm" className="flex-1" onClick={handleShare}>
+                <Button variant="outline" size="sm" className="flex-1 border-amber-200 text-amber-700 hover:bg-amber-50" onClick={handleShare}>
                   <Share2 className="mr-1 h-3 w-3" />
                   Share
                 </Button>

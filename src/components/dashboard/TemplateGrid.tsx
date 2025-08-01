@@ -59,12 +59,16 @@ export default function TemplateGrid({
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Your Templates</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+              Your Templates
+            </span>
+          </h2>
           <p className="text-gray-600">
             Create and manage your design templates
           </p>
         </div>
-        <Button onClick={onCreateNew} size="lg">
+        <Button onClick={onCreateNew} size="lg" className="bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white border-0">
           <Plus className="mr-2 h-5 w-5" />
           Create New Template
         </Button>

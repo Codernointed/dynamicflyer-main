@@ -362,7 +362,11 @@ const Editor = () => {
             className="space-y-6"
           >
             <div>
-              <h2 className="text-xl font-semibold mb-4">Enter Your Name</h2>
+              <h2 className="text-xl font-semibold mb-4">
+                <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+                  Enter Your Name
+                </span>
+              </h2>
               <p className="text-muted-foreground mb-6">
                 This will appear on your customized flyer.
               </p>
@@ -399,6 +403,7 @@ const Editor = () => {
                 variant="default"
                 onClick={() => handleStepChange(2)}
                 disabled={!name}
+                className="bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white border-0"
               >
                 Continue
               </Button>
@@ -417,7 +422,11 @@ const Editor = () => {
             className="space-y-6"
           >
             <div>
-              <h2 className="text-xl font-semibold mb-4">Upload Your Photo</h2>
+              <h2 className="text-xl font-semibold mb-4">
+                <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+                  Upload Your Photo
+                </span>
+              </h2>
               <p className="text-muted-foreground mb-6">
                 Choose a high-quality image for your flyer.
               </p>
@@ -440,6 +449,7 @@ const Editor = () => {
                 variant="default"
                 onClick={() => handleStepChange(3)}
                 disabled={!imageFile}
+                className="bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white border-0"
               >
                 Continue
               </Button>

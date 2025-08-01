@@ -180,7 +180,11 @@ export default function Analytics() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
+          <h1 className="text-3xl font-bold text-gray-900">
+            <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+              Analytics Dashboard
+            </span>
+          </h1>
           <p className="text-gray-600 mt-1">Track your template performance and user engagement</p>
         </div>
         <div className="flex items-center gap-4">
@@ -195,7 +199,7 @@ export default function Analytics() {
               <SelectItem value="1y">Last year</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline">
+          <Button variant="outline" className="border-amber-200 text-amber-700 hover:bg-amber-50">
             <Calendar className="h-4 w-4 mr-2" />
             Export Report
           </Button>

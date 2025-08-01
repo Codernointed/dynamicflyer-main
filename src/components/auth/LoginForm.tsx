@@ -89,7 +89,9 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
       <Card className="shadow-lg">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold tracking-tight">
-            Welcome back
+            <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+              Welcome back
+            </span>
           </CardTitle>
           <CardDescription>
             Sign in to your account to continue creating amazing flyers
@@ -173,9 +175,9 @@ export default function LoginForm({ onSuccess }: LoginFormProps) {
             </div>
 
             {/* Submit Button */}
-            <Button
-              type="submit"
-              className="w-full"
+                        <Button 
+              type="submit" 
+              className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white border-0" 
               disabled={loading}
             >
               {loading ? (

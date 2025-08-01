@@ -34,7 +34,7 @@ const Navbar: React.FC = () => {
     <header className={`sticky top-0 z-40 transition-all duration-300 ${isScrolled ? "bg-white/70 backdrop-blur-md shadow-sm" : "bg-transparent"}`}>
       <div className="page-container">
         <div className="flex items-center justify-between h-16">
-          <Link to="/" className="flex items-center gap-2">
+          <Link to="/" className="flex items-center gap-3">
             <motion.div 
               initial={{
                 scale: 0.9,
@@ -47,16 +47,39 @@ const Navbar: React.FC = () => {
               transition={{
                 duration: 0.3
               }} 
-              className="font-bold text-xl tracking-tight bg-inherit"
+              className="w-8 h-8 bg-gradient-to-r from-amber-400 to-yellow-500 rounded-lg flex items-center justify-center"
             >
-              Fill the UPSA Auditorium with MBA
+              <span className="text-lg font-bold text-white">∞</span>
+            </motion.div>
+            <motion.div 
+              initial={{
+                scale: 0.9,
+                opacity: 0
+              }} 
+              animate={{
+                scale: 1,
+                opacity: 1
+              }} 
+              transition={{
+                duration: 0.3,
+                delay: 0.1
+              }} 
+              className="font-bold text-xl tracking-tight"
+            >
+              <div className="text-sm font-bold bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+                INFINITY
+              </div>
+              <div className="text-xs font-semibold text-white">
+                GENERATION
+              </div>
             </motion.div>
           </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6">
             <NavLink to="/" label="Home" />
-            <NavLink to="/editor" label="Create Flyer" />
+            <NavLink to="/editor" label="Create Template" />
+            <NavLink to="/dashboard" label="Dashboard" />
           </nav>
 
           {/* Mobile Menu Button */}
@@ -93,7 +116,8 @@ const Navbar: React.FC = () => {
         >
           <nav className="flex flex-col gap-4">
             <MobileNavLink to="/" label="Home" onClick={handleLinkClick} />
-            <MobileNavLink to="/editor" label="Create Flyer" onClick={handleLinkClick} />
+            <MobileNavLink to="/editor" label="Create Template" onClick={handleLinkClick} />
+            <MobileNavLink to="/dashboard" label="Dashboard" onClick={handleLinkClick} />
           </nav>
         </motion.div>
       )}
@@ -116,8 +140,8 @@ const NavLink: React.FC<NavLinkProps> = ({ to, label }) => {
       to={to} 
       className={`px-2 py-1.5 transition-colors duration-200 rounded-md ${
         isActive 
-          ? "font-medium text-foreground" 
-          : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+          ? "font-medium text-white bg-white/20" 
+          : "text-white/80 hover:text-white hover:bg-white/10"
       }`}
     >
       {label}
@@ -133,7 +157,7 @@ const MobileNavLink: React.FC<NavLinkProps> = ({ to, label, onClick }) => {
     <Link 
       to={to} 
       className={`py-2 block transition-colors duration-200 touch-auto active:opacity-75 ${
-        isActive ? "font-semibold" : "text-muted-foreground"
+        isActive ? "font-semibold text-white" : "text-white/80"
       }`}
       onClick={(e) => {
         e.stopPropagation();

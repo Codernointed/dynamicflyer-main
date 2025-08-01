@@ -92,7 +92,11 @@ const Generator = () => {
   return (
     <Layout>
       <div className="page-container py-10">
-        <h1 className="text-3xl font-bold text-center mb-8">Create Your Flyer</h1>
+        <h1 className="text-3xl font-bold text-center mb-8">
+          <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+            Create Your Flyer
+          </span>
+        </h1>
         
         <ProgressIndicator steps={steps} />
         

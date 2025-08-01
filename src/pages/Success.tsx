@@ -223,7 +223,9 @@ const Success = () => {
               </svg>
             </div>
             <h1 className="text-3xl md:text-4xl font-bold mb-4">
-              Share your flyer 😎!
+              <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
+                Share your flyer 😎!
+              </span>
             </h1>
             <p className="text-muted-foreground mb-8">
               You have created it nicely charle lets share and rep ourselves.
