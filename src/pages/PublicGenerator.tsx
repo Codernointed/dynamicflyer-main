@@ -64,6 +64,7 @@ interface UserData {
     value: string | File;
     uploadedUrl?: string;
     transformData?: any;
+    originalFile?: File; // Store original file for re-editing
   };
 }
 
@@ -266,22 +267,49 @@ export default function PublicGenerator() {
           // Calculate aspect ratio and crop using utility function
           const cropData = cropImageToFrame(userImage, frame.width, frame.height);
 
+          // Calculate the rotated bounding box to ensure no white spaces
+          const centerX = frame.x + frame.width / 2;
+          const centerY = frame.y + frame.height / 2;
+          const rotationRad = (frame.rotation || 0) * Math.PI / 180;
+          
+          // Calculate the corners of the original rectangle
+          const corners = [
+            { x: frame.x, y: frame.y },
+            { x: frame.x + frame.width, y: frame.y },
+            { x: frame.x + frame.width, y: frame.y + frame.height },
+            { x: frame.x, y: frame.y + frame.height }
+          ];
+          
+          // Rotate the corners
+          const rotatedCorners = corners.map(corner => {
+            const dx = corner.x - centerX;
+            const dy = corner.y - centerY;
+            return {
+              x: centerX + dx * Math.cos(rotationRad) - dy * Math.sin(rotationRad),
+              y: centerY + dx * Math.sin(rotationRad) + dy * Math.cos(rotationRad)
+            };
+          });
+          
+          // Find the bounding box of the rotated rectangle
+          const minX = Math.min(...rotatedCorners.map(c => c.x));
+          const maxX = Math.max(...rotatedCorners.map(c => c.x));
+          const minY = Math.min(...rotatedCorners.map(c => c.y));
+          const maxY = Math.max(...rotatedCorners.map(c => c.y));
+
           // Draw image upright first, then apply rotated clipping
           ctx.save();
           
-          // Draw the image upright (no rotation)
+          // Draw the image upright (no rotation) - fill the entire rotated bounding box
           ctx.drawImage(
             userImage,
             cropData.sourceX, cropData.sourceY, cropData.sourceWidth, cropData.sourceHeight,
-            frame.x, frame.y, cropData.drawWidth, cropData.drawHeight
+            minX, minY, maxX - minX, maxY - minY
           );
           
           // Now apply rotated clipping path
           ctx.globalCompositeOperation = 'destination-in';
           
           // Move to frame center for rotation
-          const centerX = frame.x + frame.width / 2;
-          const centerY = frame.y + frame.height / 2;
           ctx.translate(centerX, centerY);
           ctx.rotate((frame.rotation || 0) * Math.PI / 180);
           ctx.translate(-centerX, -centerY);
@@ -302,8 +330,41 @@ export default function PublicGenerator() {
         const fontFamily = properties.fontFamily || 'Arial';
         const fontSize = properties.fontSize || 24;
         
+        // Calculate the rotated bounding box to ensure no white spaces
+        const centerX = frame.x + frame.width / 2;
+        const centerY = frame.y + frame.height / 2;
+        const rotationRad = (frame.rotation || 0) * Math.PI / 180;
+        
+        // Calculate the corners of the original rectangle
+        const corners = [
+          { x: frame.x, y: frame.y },
+          { x: frame.x + frame.width, y: frame.y },
+          { x: frame.x + frame.width, y: frame.y + frame.height },
+          { x: frame.x, y: frame.y + frame.height }
+        ];
+        
+        // Rotate the corners
+        const rotatedCorners = corners.map(corner => {
+          const dx = corner.x - centerX;
+          const dy = corner.y - centerY;
+          return {
+            x: centerX + dx * Math.cos(rotationRad) - dy * Math.sin(rotationRad),
+            y: centerY + dx * Math.sin(rotationRad) + dy * Math.cos(rotationRad)
+          };
+        });
+        
+        // Find the bounding box of the rotated rectangle
+        const minX = Math.min(...rotatedCorners.map(c => c.x));
+        const maxX = Math.max(...rotatedCorners.map(c => c.x));
+        const minY = Math.min(...rotatedCorners.map(c => c.y));
+        const maxY = Math.max(...rotatedCorners.map(c => c.y));
+        
         // Draw text upright first, then apply rotated clipping
         ctx.save();
+        
+        // Fill the entire rotated bounding box area
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+        ctx.fillRect(minX, minY, maxX - minX, maxY - minY);
         
         // Apply custom font if available
         applyFontToContext(ctx, fontFamily, fontSize);
@@ -341,8 +402,6 @@ export default function PublicGenerator() {
         ctx.globalCompositeOperation = 'destination-in';
         
         // Move to frame center for rotation
-        const centerX = frame.x + frame.width / 2;
-        const centerY = frame.y + frame.height / 2;
         ctx.translate(centerX, centerY);
         ctx.rotate((frame.rotation || 0) * Math.PI / 180);
         ctx.translate(-centerX, -centerY);
@@ -410,15 +469,16 @@ export default function PublicGenerator() {
   const handleImageEditorComplete = (editedImageUrl: string, transformData: any) => {
     if (!editingFrame) return;
 
-      setUserData(prev => ({
-        ...prev,
+    setUserData(prev => ({
+      ...prev,
       [editingFrame.id]: {
-          type: 'image',
+        type: 'image',
         value: editedImageUrl,
         uploadedUrl: editedImageUrl,
-        transformData // Store transform data for potential re-editing
-        }
-      }));
+        transformData, // Store transform data for potential re-editing
+        originalFile: editingImageFile // Store original file for re-editing
+      }
+    }));
 
     setImageEditorOpen(false);
     setEditingFrame(null);
@@ -827,9 +887,13 @@ export default function PublicGenerator() {
                                   // Re-edit existing image
                                   const existingData = userData[frame.id];
                                   if (existingData?.type === 'image') {
-                                    // For re-editing, we need to convert data URL back to file
-                                    if (typeof existingData.value === 'string' && existingData.value.startsWith('data:')) {
-                                      // Convert data URL to file
+                                    // Use original file if available, otherwise fallback to data URL
+                                    if (existingData.originalFile) {
+                                      setEditingFrame(frame);
+                                      setEditingImageFile(existingData.originalFile);
+                                      setImageEditorOpen(true);
+                                    } else if (typeof existingData.value === 'string' && existingData.value.startsWith('data:')) {
+                                      // Fallback: Convert data URL to file (for backward compatibility)
                                       fetch(existingData.value)
                                         .then(res => res.blob())
                                         .then(blob => {
@@ -997,6 +1061,7 @@ export default function PublicGenerator() {
         imageFile={editingImageFile}
         frame={editingFrame!}
         onApply={handleImageEditorComplete}
+        previousTransformData={editingFrame ? userData[editingFrame.id]?.transformData : undefined}
       />
     </div>
   );

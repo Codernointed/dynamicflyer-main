@@ -161,9 +161,15 @@ export default function EnhancedCanvasEditor({
     return { x: snappedX, y: snappedY, snapLines: lines };
   };
 
-  const snapPosition = (x: number, y: number, excludeFrameId?: string): { x: number; y: number; snapLines: { x?: number; y?: number; type: 'horizontal' | 'vertical' }[] } => {
-    let snappedX = snapToGrid(x);
-    let snappedY = snapToGrid(y);
+  const snapPosition = (x: number, y: number, excludeFrameId?: string, useGrid: boolean = true): { x: number; y: number; snapLines: { x?: number; y?: number; type: 'horizontal' | 'vertical' }[] } => {
+    let snappedX = x;
+    let snappedY = y;
+    
+    // Only apply grid snapping if enabled and useGrid is true
+    if (showGrid && useGrid) {
+      snappedX = snapToGrid(x);
+      snappedY = snapToGrid(y);
+    }
     
     const frameSnap = snapToFrame(snappedX, snappedY, excludeFrameId);
     
@@ -351,11 +357,11 @@ export default function EnhancedCanvasEditor({
     ctx.closePath();
     ctx.clip();
     
-    // Draw the content (image/text) WITHOUT rotation - always upright
+    // Draw content to fill the entire rotated bounding box (not just original frame area)
     if (frame.type === 'text') {
-      drawTextContent(ctx, frame, isSelected);
+      drawTextContent(ctx, frame, isSelected, { minX, maxX, minY, maxY });
     } else {
-      drawImageContent(ctx, frame, isSelected);
+      drawImageContent(ctx, frame, isSelected, { minX, maxX, minY, maxY });
     }
     
     ctx.restore();
@@ -390,9 +396,14 @@ export default function EnhancedCanvasEditor({
   }, []);
 
   // Draw text content (always upright)
-  const drawTextContent = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
-    // The content is already clipped to the rotated frame bounds
-    // Just draw the text in the center of the original frame coordinates
+  const drawTextContent = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean, bounds?: { minX: number; maxX: number; minY: number; maxY: number }) => {
+    // Fill the entire rotated bounding box area
+    if (bounds) {
+      ctx.fillStyle = 'rgba(156, 163, 175, 0.1)';
+      ctx.fillRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+    }
+    
+    // Draw the text in the center of the original frame coordinates
     ctx.fillStyle = '#9ca3af';
     ctx.font = `${frame.properties?.fontSize || 16}px ${frame.properties?.fontFamily || 'Arial'}`;
     ctx.textAlign = 'center';
@@ -404,13 +415,18 @@ export default function EnhancedCanvasEditor({
   }, []);
 
   // Draw image content (always upright)
-  const drawImageContent = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
-    // The content is already clipped to the rotated frame bounds
-    // Fill the entire frame area and draw the icon in the center
-    ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
-    ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
+  const drawImageContent = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean, bounds?: { minX: number; maxX: number; minY: number; maxY: number }) => {
+    // Fill the entire rotated bounding box area
+    if (bounds) {
+      ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
+      ctx.fillRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+    } else {
+      // Fallback to original frame area
+      ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
+      ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
+    }
     
-    // Draw image icon
+    // Draw image icon in the center
     ctx.fillStyle = '#6b7280';
     ctx.font = '16px Arial';
     ctx.textAlign = 'center';
@@ -560,8 +576,6 @@ export default function EnhancedCanvasEditor({
   }, [frames]);
 
   const getResizeHandle = useCallback((x: number, y: number, frame: FrameData): string | null => {
-    if (!selectedFrame) return null;
-
     const handles = [
       { x: frame.x, y: frame.y, handle: 'nw' },
       { x: frame.x + frame.width / 2, y: frame.y, handle: 'n' },
@@ -588,7 +602,7 @@ export default function EnhancedCanvasEditor({
     }
 
     return null;
-  }, [selectedFrame]);
+  }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (readOnly) return;
@@ -682,11 +696,21 @@ export default function EnhancedCanvasEditor({
         const newX = dragState.startFrame!.x + deltaX;
         const newY = dragState.startFrame!.y + deltaY;
         
-        const snapped = snapPosition(newX, newY, f.id);
-        newFrame.x = snapped.x;
-        newFrame.y = snapped.y;
+        // Use modifier keys for different snapping behavior
+        const useGrid = !e.altKey; // Alt key disables grid snapping for precise movement
+        const useSnapping = !e.ctrlKey; // Ctrl key disables all snapping for free movement
         
-        setSnapLines(snapped.snapLines);
+        if (useSnapping) {
+          const snapped = snapPosition(newX, newY, f.id, useGrid);
+          newFrame.x = snapped.x;
+          newFrame.y = snapped.y;
+          setSnapLines(snapped.snapLines);
+        } else {
+          // Free movement - no snapping
+          newFrame.x = newX;
+          newFrame.y = newY;
+          setSnapLines([]);
+        }
       } else if (dragState.isResizing) {
         const handle = dragState.resizeHandle;
         if (handle?.includes('e')) {
@@ -1098,7 +1122,7 @@ export default function EnhancedCanvasEditor({
 
         <div className="flex items-center gap-2">
           <div className="text-xs text-gray-500">
-            <span className="hidden sm:inline">Arrow keys: Move • Ctrl+R: Rotate • Ctrl+Shift+R: Rotate CCW • Ctrl+0: Reset • Delete: Remove</span>
+            <span className="hidden sm:inline">Arrow keys: Move • Ctrl+R: Rotate • Ctrl+Shift+R: Rotate CCW • Ctrl+0: Reset • Delete: Remove • Alt: Precise • Ctrl: Free</span>
           </div>
           <Button
             variant="outline"

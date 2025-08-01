@@ -33,6 +33,7 @@ interface ImageEditorModalProps {
   imageFile: File | null;
   frame: FrameData;
   onApply: (editedImageUrl: string, transformData: any) => void;
+  previousTransformData?: any; // Add previous transform data for re-editing
 }
 
 interface TransformData {
@@ -47,7 +48,8 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
   onClose,
   imageFile,
   frame,
-  onApply
+  onApply,
+  previousTransformData
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [image, setImage] = useState<HTMLImageElement | null>(null);
@@ -82,7 +84,13 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
   const initializeTransform = useCallback((img: HTMLImageElement) => {
     if (!canvasRef.current) return;
 
-    // Calculate scale to cover the frame
+    // If we have previous transform data, use it (for re-editing)
+    if (previousTransformData) {
+      setTransform(previousTransformData);
+      return;
+    }
+
+    // Calculate scale to cover the frame (for new images)
     const scaleX = frame.width / img.width;
     const scaleY = frame.height / img.height;
     const scale = Math.max(scaleX, scaleY); // Cover the frame completely
@@ -93,7 +101,7 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
       x: 0,
       y: 0
     });
-  }, [frame]);
+  }, [frame, previousTransformData]);
 
   // Draw everything
   const drawCanvas = useCallback(() => {
