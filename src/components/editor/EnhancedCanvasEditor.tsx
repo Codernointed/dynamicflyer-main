@@ -89,7 +89,7 @@ export default function EnhancedCanvasEditor({
     createShape: 'rectangle',
   });
   const [snapLines, setSnapLines] = useState<{ x?: number; y?: number; type: 'horizontal' | 'vertical' }[]>([]);
-  const [showGrid, setShowGrid] = useState(true);
+  const [showGrid, setShowGrid] = useState(false);
   const [showGuides, setShowGuides] = useState(true);
   const [fineGrid, setFineGrid] = useState(false);
   const [rotationInput, setRotationInput] = useState<string>('');
