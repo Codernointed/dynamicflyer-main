@@ -57,7 +57,7 @@ export default function DashboardSidebar({ onClose }: DashboardSidebarProps) {
             <Sparkles className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">TemplateHub</h2>
+            <h2 className="text-lg font-semibold text-gray-900"></h2>
             <p className="text-xs text-gray-500">Design Platform</p>
           </div>
         </div>
@@ -71,10 +71,7 @@ export default function DashboardSidebar({ onClose }: DashboardSidebarProps) {
 
       {/* Create New Template */}
       <div className="p-6 pb-4">
-        <Button className="w-full" size="lg">
-          <Plus className="mr-2 h-5 w-5" />
-          Create New Template
-        </Button>
+
       </div>
 
       <div className="flex-1 overflow-y-auto px-6">
