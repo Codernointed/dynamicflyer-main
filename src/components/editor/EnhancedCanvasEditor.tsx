@@ -734,23 +734,31 @@ export default function EnhancedCanvasEditor({
           newFrame.y = newY;
           setSnapLines([]);
         }
+        
+        // Constrain to canvas boundaries
+        newFrame.x = Math.max(0, Math.min(canvasSize.width - newFrame.width, newFrame.x));
+        newFrame.y = Math.max(0, Math.min(canvasSize.height - newFrame.height, newFrame.y));
       } else if (dragState.isResizing) {
         const handle = dragState.resizeHandle;
         if (handle?.includes('e')) {
-          newFrame.width = Math.max(MIN_FRAME_SIZE, dragState.startFrame!.width + deltaX);
+          const newWidth = Math.max(MIN_FRAME_SIZE, dragState.startFrame!.width + deltaX);
+          newFrame.width = Math.min(newWidth, canvasSize.width - newFrame.x);
         }
         if (handle?.includes('w')) {
           const newWidth = Math.max(MIN_FRAME_SIZE, dragState.startFrame!.width - deltaX);
-          newFrame.x = dragState.startFrame!.x + dragState.startFrame!.width - newWidth;
-          newFrame.width = newWidth;
+          const maxWidth = newFrame.x + newFrame.width;
+          newFrame.x = Math.max(0, dragState.startFrame!.x + dragState.startFrame!.width - newWidth);
+          newFrame.width = Math.min(newWidth, maxWidth - newFrame.x);
         }
         if (handle?.includes('s')) {
-          newFrame.height = Math.max(MIN_FRAME_SIZE, dragState.startFrame!.height + deltaY);
+          const newHeight = Math.max(MIN_FRAME_SIZE, dragState.startFrame!.height + deltaY);
+          newFrame.height = Math.min(newHeight, canvasSize.height - newFrame.y);
         }
         if (handle?.includes('n')) {
           const newHeight = Math.max(MIN_FRAME_SIZE, dragState.startFrame!.height - deltaY);
-          newFrame.y = dragState.startFrame!.y + dragState.startFrame!.height - newHeight;
-          newFrame.height = newHeight;
+          const maxHeight = newFrame.y + newFrame.height;
+          newFrame.y = Math.max(0, dragState.startFrame!.y + dragState.startFrame!.height - newHeight);
+          newFrame.height = Math.min(newHeight, maxHeight - newFrame.y);
         }
       } else if (dragState.isRotating) {
         const centerX = dragState.startFrame!.x + dragState.startFrame!.width / 2;
@@ -768,7 +776,7 @@ export default function EnhancedCanvasEditor({
     });
 
     onFramesChange?.(updatedFrames);
-  }, [dragState, getMousePos, frames, selectedFrameId, getFrameAtPosition, getResizeHandle, onFramesChange]);
+  }, [dragState, getMousePos, frames, selectedFrameId, getFrameAtPosition, getResizeHandle, onFramesChange, canvasSize]);
 
   const handleMouseUp = useCallback(() => {
     setDragState({
@@ -790,13 +798,22 @@ export default function EnhancedCanvasEditor({
   const createFrame = useCallback((type: 'image' | 'text', shape: 'rectangle' | 'circle' | 'rounded-rectangle' = 'rectangle') => {
     if (!onFramesChange) return;
 
+    const frameWidth = type === 'image' ? 200 : 300;
+    const frameHeight = type === 'image' ? 200 : 80;
+    
+    // Calculate position to ensure frame stays within canvas bounds
+    const baseX = 100 + frames.length * 20;
+    const baseY = 100 + frames.length * 20;
+    const x = Math.max(0, Math.min(canvasSize.width - frameWidth, baseX));
+    const y = Math.max(0, Math.min(canvasSize.height - frameHeight, baseY));
+
     const newFrame: FrameData = {
       id: `frame_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       type,
-      x: 100 + frames.length * 20,
-      y: 100 + frames.length * 20,
-      width: type === 'image' ? 200 : 300,
-      height: type === 'image' ? 200 : 80,
+      x,
+      y,
+      width: frameWidth,
+      height: frameHeight,
       rotation: 0,
       shape,
       cornerRadius: shape === 'rounded-rectangle' ? 10 : undefined,
@@ -814,7 +831,7 @@ export default function EnhancedCanvasEditor({
     onFrameSelect(newFrame.id);
     
     toast.success(`${type === 'image' ? 'Image' : 'Text'} frame created!`);
-  }, [frames, onFramesChange, onFrameSelect]);
+  }, [frames, onFramesChange, onFrameSelect, canvasSize]);
 
   // Delete selected frame
   const deleteSelectedFrame = useCallback(() => {
@@ -838,25 +855,25 @@ export default function EnhancedCanvasEditor({
       switch (e.key) {
         case 'ArrowLeft':
           e.preventDefault();
-          const newX = selectedFrame.x - step;
+          const newX = Math.max(0, selectedFrame.x - step);
           const snappedX = snapToGrid(newX);
           updateFrame({ x: snappedX });
           break;
         case 'ArrowRight':
           e.preventDefault();
-          const newXRight = selectedFrame.x + step;
+          const newXRight = Math.min(canvasSize.width - selectedFrame.width, selectedFrame.x + step);
           const snappedXRight = snapToGrid(newXRight);
           updateFrame({ x: snappedXRight });
           break;
         case 'ArrowUp':
           e.preventDefault();
-          const newY = selectedFrame.y - step;
+          const newY = Math.max(0, selectedFrame.y - step);
           const snappedY = snapToGrid(newY);
           updateFrame({ y: snappedY });
           break;
         case 'ArrowDown':
           e.preventDefault();
-          const newYDown = selectedFrame.y + step;
+          const newYDown = Math.min(canvasSize.height - selectedFrame.height, selectedFrame.y + step);
           const snappedYDown = snapToGrid(newYDown);
           updateFrame({ y: snappedYDown });
           break;

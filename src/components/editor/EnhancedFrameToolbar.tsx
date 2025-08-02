@@ -249,7 +249,7 @@ export default function EnhancedFrameToolbar({
                       {frame.type === 'image' ? 'Image' : 'Text'} Frame
                     </div>
                     <div className="text-gray-500">
-                      {frame.shape} • {frame.width}×{frame.height}
+                      {frame.shape} • {frame.width.toFixed(0)}×{frame.height.toFixed(0)}
                     </div>
                 </div>
           </div>
