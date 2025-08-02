@@ -57,8 +57,8 @@ export default function DashboardSidebar({ onClose }: DashboardSidebarProps) {
             <Sparkles className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-gray-900"></h2>
-            <p className="text-xs text-gray-500">Design Platform</p>
+            <h2 className="text-lg font-semibold text-gray-900">GenEdit</h2>
+            <p className="text-xs text-gray-500">Design Studio</p>
           </div>
         </div>
         

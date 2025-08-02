@@ -24,7 +24,7 @@ const Hero: React.FC = () => {
             transition={{ duration: 0.5, delay: 0.3 }} 
             className="text-lg md:text-xl text-white max-w-3xl mx-auto mb-12 drop-shadow-md"
           >
-            Design beautiful flyer templates, share them with anyone, and let people create personalized versions with their own photos and details. No design skills required!
+            Design beautiful flyer templates with GenEdit, share them with anyone, and let people create personalized versions with their own photos and details. No design skills required!
           </motion.p>
           
           <motion.div 
