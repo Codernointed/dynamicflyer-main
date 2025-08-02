@@ -122,7 +122,7 @@ export default function SignUpForm({ onSuccess }: SignUpFormProps) {
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold tracking-tight">
             <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
-              Create your account
+            Create your account
             </span>
           </CardTitle>
           <CardDescription>
@@ -292,8 +292,8 @@ export default function SignUpForm({ onSuccess }: SignUpFormProps) {
             </div>
 
             {/* Submit Button */}
-                        <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white border-0" 
               disabled={loading}
             >

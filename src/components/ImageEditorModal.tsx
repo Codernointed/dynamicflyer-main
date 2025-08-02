@@ -413,19 +413,19 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
       tempCanvas.width = frame.width;
       tempCanvas.height = frame.height;
 
-      // Only apply user transformations - NO frame rotation to image content
+      // Apply ONLY user transformations (no frame rotation - that's handled by main canvas)
       const frameCenterX = frame.width / 2;
       const frameCenterY = frame.height / 2;
       
       tempCtx.save();
       
-      // Apply ONLY user transformations (no frame rotation)
+      // Apply ONLY user transformations (scale, user rotation, position)
       tempCtx.translate(frameCenterX, frameCenterY);
       tempCtx.rotate((transform.rotation * Math.PI) / 180);
       tempCtx.scale(transform.scale, transform.scale);
       tempCtx.translate(transform.x, transform.y);
 
-      // Draw image (always upright)
+      // Draw image (upright - frame rotation will be applied by main canvas)
       tempCtx.drawImage(
         image,
         -image.width / 2,
@@ -436,15 +436,12 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
 
       tempCtx.restore();
 
-      // Create clipping path based on frame shape (with frame rotation)
+      // Create clipping path based on frame shape (upright rectangle)
       tempCtx.globalCompositeOperation = 'destination-in';
       tempCtx.beginPath();
       
-      // Apply frame rotation ONLY for clipping (not for image content)
+      // Create upright shape (frame rotation will be applied by main canvas)
       tempCtx.save();
-      tempCtx.translate(frameCenterX, frameCenterY);
-      tempCtx.rotate((frame.rotation * Math.PI) / 180);
-      tempCtx.translate(-frameCenterX, -frameCenterY);
       
       switch (frame.shape) {
         case 'circle': {

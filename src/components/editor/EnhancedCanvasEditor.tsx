@@ -314,59 +314,11 @@ export default function EnhancedCanvasEditor({
 
   // Draw a single frame
   const drawFrame = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
-    ctx.save();
-    
-    // Calculate the rotated bounding box to ensure no spaces
     const centerX = frame.x + frame.width / 2;
     const centerY = frame.y + frame.height / 2;
     const rotationRad = (frame.rotation * Math.PI) / 180;
     
-    // Calculate the corners of the original rectangle
-    const corners = [
-      { x: frame.x, y: frame.y },
-      { x: frame.x + frame.width, y: frame.y },
-      { x: frame.x + frame.width, y: frame.y + frame.height },
-      { x: frame.x, y: frame.y + frame.height }
-    ];
-    
-    // Rotate the corners
-    const rotatedCorners = corners.map(corner => {
-      const dx = corner.x - centerX;
-      const dy = corner.y - centerY;
-      return {
-        x: centerX + dx * Math.cos(rotationRad) - dy * Math.sin(rotationRad),
-        y: centerY + dx * Math.sin(rotationRad) + dy * Math.cos(rotationRad)
-      };
-    });
-    
-    // Find the bounding box of the rotated rectangle
-    const minX = Math.min(...rotatedCorners.map(c => c.x));
-    const maxX = Math.max(...rotatedCorners.map(c => c.x));
-    const minY = Math.min(...rotatedCorners.map(c => c.y));
-    const maxY = Math.max(...rotatedCorners.map(c => c.y));
-    
-    // Create a clipping path for the rotated frame
-    ctx.beginPath();
-    rotatedCorners.forEach((corner, index) => {
-      if (index === 0) {
-        ctx.moveTo(corner.x, corner.y);
-      } else {
-        ctx.lineTo(corner.x, corner.y);
-      }
-    });
-    ctx.closePath();
-    ctx.clip();
-    
-    // Draw content to fill the entire rotated bounding box (not just original frame area)
-    if (frame.type === 'text') {
-      drawTextContent(ctx, frame, isSelected, { minX, maxX, minY, maxY });
-    } else {
-      drawImageContent(ctx, frame, isSelected, { minX, maxX, minY, maxY });
-    }
-    
-    ctx.restore();
-    
-    // Draw the rotated frame border
+    // Draw the rotated frame border first
     ctx.save();
     ctx.translate(centerX, centerY);
     ctx.rotate(rotationRad);
@@ -389,21 +341,35 @@ export default function EnhancedCanvasEditor({
     
     ctx.restore();
     
+    // Draw content in rotated coordinate system
+    if (frame.type === 'text') {
+      drawTextContent(ctx, frame, isSelected);
+    } else {
+      drawImageContent(ctx, frame, isSelected);
+    }
+    
     // Draw selection handles (also rotated)
     if (isSelected) {
       drawSelectionHandles(ctx, frame);
     }
   }, []);
 
-  // Draw text content (always upright)
-  const drawTextContent = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean, bounds?: { minX: number; maxX: number; minY: number; maxY: number }) => {
-    // Fill the entire rotated bounding box area
-    if (bounds) {
-      ctx.fillStyle = 'rgba(156, 163, 175, 0.1)';
-      ctx.fillRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
-    }
+  // Draw text content (rotated with frame)
+  const drawTextContent = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
+    const centerX = frame.x + frame.width / 2;
+    const centerY = frame.y + frame.height / 2;
+    const rotationRad = (frame.rotation * Math.PI) / 180;
     
-    // Draw the text in the center of the original frame coordinates
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(rotationRad);
+    ctx.translate(-centerX, -centerY);
+    
+    // Fill the frame area with background
+    ctx.fillStyle = 'rgba(156, 163, 175, 0.1)';
+    ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
+    
+    // Draw the text in the center of the frame coordinates
     ctx.fillStyle = '#9ca3af';
     ctx.font = `${frame.properties?.fontSize || 16}px ${frame.properties?.fontFamily || 'Arial'}`;
     ctx.textAlign = 'center';
@@ -412,25 +378,32 @@ export default function EnhancedCanvasEditor({
       frame.x + frame.width / 2,
       frame.y + frame.height / 2 + 5
     );
+    
+    ctx.restore();
   }, []);
 
-  // Draw image content (always upright)
-  const drawImageContent = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean, bounds?: { minX: number; maxX: number; minY: number; maxY: number }) => {
-    // Fill the entire rotated bounding box area
-    if (bounds) {
-      ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
-      ctx.fillRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
-    } else {
-      // Fallback to original frame area
-      ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
-      ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
-    }
+  // Draw image content (rotated with frame)
+  const drawImageContent = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
+    const centerX = frame.x + frame.width / 2;
+    const centerY = frame.y + frame.height / 2;
+    const rotationRad = (frame.rotation * Math.PI) / 180;
+    
+    ctx.save();
+    ctx.translate(centerX, centerY);
+    ctx.rotate(rotationRad);
+    ctx.translate(-centerX, -centerY);
+    
+    // Fill the frame area with background
+    ctx.fillStyle = 'rgba(156, 163, 175, 0.3)';
+    ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
     
     // Draw image icon in the center
     ctx.fillStyle = '#6b7280';
     ctx.font = '16px Arial';
     ctx.textAlign = 'center';
     ctx.fillText('📷', frame.x + frame.width / 2, frame.y + frame.height / 2 + 5);
+    
+    ctx.restore();
   }, []);
 
   // Draw rectangle frame border (rotated)
@@ -508,8 +481,22 @@ export default function EnhancedCanvasEditor({
     ctx.stroke();
   }, []);
 
-  // Draw selection handles
+  // Draw selection handles (rotated with frame)
   const drawSelectionHandles = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData) => {
+    const centerX = frame.x + frame.width / 2;
+    const centerY = frame.y + frame.height / 2;
+    const rotationRad = (frame.rotation * Math.PI) / 180;
+    
+    // Calculate rotated handle positions
+    const getRotatedPosition = (x: number, y: number) => {
+      const dx = x - centerX;
+      const dy = y - centerY;
+      return {
+        x: centerX + dx * Math.cos(rotationRad) - dy * Math.sin(rotationRad),
+        y: centerY + dx * Math.sin(rotationRad) + dy * Math.cos(rotationRad)
+      };
+    };
+    
     const handles = [
       { x: frame.x, y: frame.y, cursor: 'nw-resize' },
       { x: frame.x + frame.width / 2, y: frame.y, cursor: 'n-resize' },
@@ -521,35 +508,41 @@ export default function EnhancedCanvasEditor({
       { x: frame.x, y: frame.y + frame.height / 2, cursor: 'w-resize' },
     ];
 
+    // Draw rotated handles
     handles.forEach(handle => {
+      const rotatedPos = getRotatedPosition(handle.x, handle.y);
+      
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#3b82f6';
       ctx.lineWidth = 1;
       ctx.setLineDash([]);
       
       ctx.beginPath();
-      ctx.arc(handle.x, handle.y, RESIZE_HANDLE_SIZE / 2, 0, 2 * Math.PI);
+      ctx.arc(rotatedPos.x, rotatedPos.y, RESIZE_HANDLE_SIZE / 2, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
     });
 
-    // Draw rotation handle
+    // Draw rotation handle (also rotated)
     const rotationHandleY = frame.y - ROTATION_HANDLE_DISTANCE;
+    const rotationHandlePos = getRotatedPosition(frame.x + frame.width / 2, rotationHandleY);
+    
     ctx.fillStyle = '#ffffff';
     ctx.strokeStyle = '#3b82f6';
     ctx.lineWidth = 1;
     
     ctx.beginPath();
-    ctx.arc(frame.x + frame.width / 2, rotationHandleY, RESIZE_HANDLE_SIZE / 2, 0, 2 * Math.PI);
+    ctx.arc(rotationHandlePos.x, rotationHandlePos.y, RESIZE_HANDLE_SIZE / 2, 0, 2 * Math.PI);
     ctx.fill();
     ctx.stroke();
 
-    // Draw rotation line
+    // Draw rotation line (rotated)
+    const topCenterPos = getRotatedPosition(frame.x + frame.width / 2, frame.y);
     ctx.strokeStyle = '#3b82f6';
     ctx.setLineDash([3, 3]);
     ctx.beginPath();
-    ctx.moveTo(frame.x + frame.width / 2, frame.y);
-    ctx.lineTo(frame.x + frame.width / 2, rotationHandleY);
+    ctx.moveTo(topCenterPos.x, topCenterPos.y);
+    ctx.lineTo(rotationHandlePos.x, rotationHandlePos.y);
     ctx.stroke();
   }, []);
 
@@ -567,8 +560,21 @@ export default function EnhancedCanvasEditor({
   const getFrameAtPosition = useCallback((x: number, y: number): FrameData | null => {
     for (let i = frames.length - 1; i >= 0; i--) {
       const frame = frames[i];
-      if (x >= frame.x && x <= frame.x + frame.width &&
-          y >= frame.y && y <= frame.y + frame.height) {
+      
+      // Check if point is inside the rotated frame
+      const centerX = frame.x + frame.width / 2;
+      const centerY = frame.y + frame.height / 2;
+      const rotationRad = (frame.rotation * Math.PI) / 180;
+      
+      // Transform point to frame's coordinate system
+      const dx = x - centerX;
+      const dy = y - centerY;
+      const rotatedX = dx * Math.cos(-rotationRad) - dy * Math.sin(-rotationRad);
+      const rotatedY = dx * Math.sin(-rotationRad) + dy * Math.cos(-rotationRad);
+      
+      // Check if transformed point is inside the frame bounds
+      if (rotatedX >= -frame.width / 2 && rotatedX <= frame.width / 2 &&
+          rotatedY >= -frame.height / 2 && rotatedY <= frame.height / 2) {
         return frame;
       }
     }
@@ -576,6 +582,20 @@ export default function EnhancedCanvasEditor({
   }, [frames]);
 
   const getResizeHandle = useCallback((x: number, y: number, frame: FrameData): string | null => {
+    const centerX = frame.x + frame.width / 2;
+    const centerY = frame.y + frame.height / 2;
+    const rotationRad = (frame.rotation * Math.PI) / 180;
+    
+    // Calculate rotated handle positions
+    const getRotatedPosition = (x: number, y: number) => {
+      const dx = x - centerX;
+      const dy = y - centerY;
+      return {
+        x: centerX + dx * Math.cos(rotationRad) - dy * Math.sin(rotationRad),
+        y: centerY + dx * Math.sin(rotationRad) + dy * Math.cos(rotationRad)
+      };
+    };
+    
     const handles = [
       { x: frame.x, y: frame.y, handle: 'nw' },
       { x: frame.x + frame.width / 2, y: frame.y, handle: 'n' },
@@ -587,16 +607,19 @@ export default function EnhancedCanvasEditor({
       { x: frame.x, y: frame.y + frame.height / 2, handle: 'w' },
     ];
 
+    // Check rotated handles
     for (const handle of handles) {
-      const distance = Math.sqrt((x - handle.x) ** 2 + (y - handle.y) ** 2);
+      const rotatedPos = getRotatedPosition(handle.x, handle.y);
+      const distance = Math.sqrt((x - rotatedPos.x) ** 2 + (y - rotatedPos.y) ** 2);
       if (distance <= RESIZE_HANDLE_SIZE) {
         return handle.handle;
       }
     }
 
-    // Check rotation handle
+    // Check rotation handle (also rotated)
     const rotationHandleY = frame.y - ROTATION_HANDLE_DISTANCE;
-    const rotationDistance = Math.sqrt((x - (frame.x + frame.width / 2)) ** 2 + (y - rotationHandleY) ** 2);
+    const rotationHandlePos = getRotatedPosition(frame.x + frame.width / 2, rotationHandleY);
+    const rotationDistance = Math.sqrt((x - rotationHandlePos.x) ** 2 + (y - rotationHandlePos.y) ** 2);
     if (rotationDistance <= RESIZE_HANDLE_SIZE) {
       return 'rotate';
     }

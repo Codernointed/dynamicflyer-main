@@ -71,7 +71,7 @@ export default function DashboardLayout() {
             </Button>
             <h1 className="text-xl font-semibold text-gray-900">
               <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
-                Template Dashboard
+              Template Dashboard
               </span>
             </h1>
           </div>

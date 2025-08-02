@@ -224,7 +224,7 @@ const Success = () => {
             </div>
             <h1 className="text-3xl md:text-4xl font-bold mb-4">
               <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
-                Share your flyer 😎!
+              Share your flyer 😎!
               </span>
             </h1>
             <p className="text-muted-foreground mb-8">
