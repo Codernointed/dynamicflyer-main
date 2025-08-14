@@ -170,23 +170,58 @@ export async function getCurrentProfile(): Promise<Profile | null> {
 // =====================================================
 
 /**
- * Get all templates for the current user
+ * Get all templates for the current user with enhanced session handling
  */
 export async function getUserTemplates(): Promise<Template[]> {
-  // Get the current user to ensure we only fetch their templates
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    throw new Error('User not authenticated');
+  try {
+    // First try to get the current session
+    let { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    // If no session or session error, try to refresh
+    if (sessionError || !session?.user) {
+      console.log('🔄 No valid session, attempting refresh...');
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      
+      if (refreshError || !refreshData.session?.user) {
+        throw new Error('Session expired. Please log in again.');
+      }
+      
+      session = refreshData.session;
+      console.log('✅ Session refreshed successfully');
+    }
+
+    const user = session.user;
+    console.log('📋 Fetching templates for user:', user.email);
+
+    const { data, error } = await supabase
+      .from('templates')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('❌ Error fetching templates:', error);
+      
+      // Handle specific RLS policy errors
+      if (error.code === 'PGRST301' || error.message?.includes('RLS')) {
+        throw new Error('Access denied. Please log in again.');
+      }
+      
+      throw error;
+    }
+
+    console.log('✅ Templates fetched successfully:', data?.length || 0);
+    return data || [];
+  } catch (error: any) {
+    console.error('❌ getUserTemplates error:', error);
+    
+    // Re-throw with user-friendly message
+    if (error.message?.includes('Session expired') || error.message?.includes('Access denied')) {
+      throw error;
+    }
+    
+    throw new Error('Failed to load templates. Please try refreshing the page.');
   }
-
-  const { data, error } = await supabase
-    .from('templates')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  return data || [];
 }
 
 /**
@@ -199,14 +234,12 @@ export async function searchTemplates(
 ): Promise<Template[]> {
   try {
     // Try to use the database function first
-    let query = supabase
-      .rpc('search_templates', {
-        search_query: searchQuery || null,
-        template_type_filter: templateType || null,
-        user_id_filter: userId || null
-      });
+    const { data, error } = await (supabase as any).rpc('search_templates', {
+      search_query: searchQuery || null,
+      template_type_filter: templateType || null,
+      user_id_filter: userId || null
+    });
 
-    const { data, error } = await query;
     if (error) throw error;
     return data || [];
   } catch (dbError) {
@@ -239,10 +272,9 @@ export async function searchTemplates(
  */
 export async function getTemplateStatsByType(userId?: string) {
   try {
-    const { data, error } = await supabase
-      .rpc('get_template_stats_by_type', {
-        user_id_filter: userId || null
-      });
+    const { data, error } = await (supabase as any).rpc('get_template_stats_by_type', {
+      user_id_filter: userId || null
+    });
 
     if (error) throw error;
     return data || [];
@@ -277,41 +309,59 @@ export async function getTemplateStatsByType(userId?: string) {
 }
 
 /**
- * Get popular tags
+ * Get popular tags with better error handling
  */
 export async function getPopularTags(limit: number = 20) {
   try {
-    const { data, error } = await supabase
-      .rpc('get_popular_tags', {
-        limit_count: limit
-      });
-
-    if (error) throw error;
-    return data || [];
-  } catch (dbError) {
-    // Fallback to client-side calculation
-    console.warn('Database tags function not available, using client-side calculation');
-    
-    const { data: templates, error: fallbackError } = await supabase
-      .from('templates')
-      .select('tags')
-      .eq('is_public', true);
-
-    if (fallbackError) throw fallbackError;
-    
-    const tagCounts: Record<string, number> = {};
-    (templates || []).forEach(template => {
-      if (template.tags && Array.isArray(template.tags)) {
-        template.tags.forEach((tag: string) => {
-          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-        });
-      }
+    // Try database function first with better error handling
+    const { data, error } = await (supabase as any).rpc('get_popular_tags', {
+      limit_count: limit
     });
+
+    if (error) {
+      // Check if it's a function not found error
+      if (error.code === 'PGRST202' || error.message?.includes('function') || error.message?.includes('404')) {
+        throw new Error('Function not available');
+      }
+      throw error;
+    }
     
-    return Object.entries(tagCounts)
-      .map(([tag, count]) => ({ tag, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, limit);
+    return data || [];
+  } catch (dbError: any) {
+    // Fallback to client-side calculation for function not found or other RPC errors
+    console.log('Database tags function not available, using client-side calculation');
+    
+    try {
+      const { data: templates, error: fallbackError } = await supabase
+        .from('templates')
+        .select('tags')
+        .eq('is_public', true)
+        .limit(1000); // Limit to prevent performance issues
+
+      if (fallbackError) {
+        console.warn('Fallback template query failed:', fallbackError);
+        return []; // Return empty array instead of throwing
+      }
+      
+      const tagCounts: Record<string, number> = {};
+      (templates || []).forEach(template => {
+        if (template.tags && Array.isArray(template.tags)) {
+          template.tags.forEach((tag: string) => {
+            if (typeof tag === 'string' && tag.trim()) {
+              tagCounts[tag.trim()] = (tagCounts[tag.trim()] || 0) + 1;
+            }
+          });
+        }
+      });
+      
+      return Object.entries(tagCounts)
+        .map(([tag, count]) => ({ tag, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, limit);
+    } catch (fallbackError) {
+      console.error('Both database function and fallback failed:', fallbackError);
+      return []; // Return empty array to prevent app crashes
+    }
   }
 }
 
@@ -331,7 +381,7 @@ export async function getTemplate(templateId: string): Promise<TemplateWithFrame
   // Parse the frames JSON into typed Frame objects
   const template: TemplateWithFrames = {
     ...data,
-    frames: (data.frames as Frame[]) || []
+    frames: (data.frames as unknown as Frame[]) || []
   };
 
   return template;
@@ -379,7 +429,7 @@ export async function getPublicTemplate(templateId: string): Promise<TemplateWit
 
     const template: TemplateWithFrames = {
       ...data,
-      frames: (data.frames as Frame[]) || []
+      frames: (data.frames as unknown as Frame[]) || []
     };
 
     console.log('Returning template with frames:', template.frames?.length || 0);
@@ -847,7 +897,7 @@ export async function incrementExportCount(): Promise<void> {
   const { error } = await supabase
     .from('profiles')
     .update({ 
-      monthly_exports: supabase.raw('monthly_exports + 1') 
+      monthly_exports: (supabase as any).raw('monthly_exports + 1') 
     })
     .eq('id', session.user.id);
 
