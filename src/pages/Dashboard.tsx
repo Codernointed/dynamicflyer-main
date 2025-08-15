@@ -209,26 +209,8 @@ export default function Dashboard() {
       return;
     }
 
-    try {
-      const newTemplate = await createTemplate({
-        name: 'Untitled Template',
-        description: 'A new template',
-        template_type: 'flyer',
-        is_public: false,
-        frames: [],
-        user_id: user.id,
-      });
-
-      // Update local state immediately
-      setTemplates(prev => [newTemplate, ...prev]);
-      
-      // Navigate to editor
-      navigate(`/dashboard/editor/${newTemplate.id}`);
-      toast.success('Template created successfully!');
-    } catch (error) {
-      console.error('Error creating template:', error);
-      toast.error('Failed to create template. Please try again.');
-    }
+    // Navigate directly to the editor - template will be created when user uploads background
+    navigate('/dashboard/editor/new');
   }, [user, navigate]);
 
   /**

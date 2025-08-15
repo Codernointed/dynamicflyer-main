@@ -218,7 +218,7 @@ export function useAuth(): AuthContextType {
       // document.removeEventListener('visibilitychange', handleVisibilityChange);
       // window.removeEventListener('focus', handleVisibilityChange);
     };
-  }, [loadProfile, state.profile]);
+  }, [loadProfile]);
 
   /**
    * Sign up a new user

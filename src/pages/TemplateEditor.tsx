@@ -167,6 +167,12 @@ export default function TemplateEditor() {
       return;
     }
 
+    if (!backgroundUrl) {
+      console.error('❌ No background image uploaded');
+      toast.error('Please upload a background image before saving');
+      return;
+    }
+
     // Prevent multiple simultaneous saves
     if (saveInProgress) {
       console.log('⚠️ Save already in progress, ignoring request');
@@ -483,8 +489,11 @@ export default function TemplateEditor() {
               <EnhancedPropertiesPanel
                 frame={selectedFrame}
                 onFrameUpdate={canEditTemplate ? handleFrameUpdate : undefined}
-                onFrameDelete={canEditTemplate ? handleDeleteFrame : undefined}
-                onFrameDuplicate={canEditTemplate ? handleDuplicateFrame : undefined}
+                onFrameDelete={canEditTemplate ? (frameId: string) => handleDeleteFrame(frameId) : undefined}
+                onFrameDuplicate={canEditTemplate ? (frameId: string) => {
+                  const frame = frames.find(f => f.id === frameId);
+                  if (frame) handleDuplicateFrame(frame);
+                } : undefined}
               />
             )}
           </div>
