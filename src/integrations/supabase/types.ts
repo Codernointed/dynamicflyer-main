@@ -6,102 +6,108 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[]
 
-export type Database = {
+export interface Database {
   public: {
     Tables: {
       profiles: {
         Row: {
           id: string
           email: string
-          full_name: string | null
+          full_name: string
           avatar_url: string | null
           created_at: string
           updated_at: string
-          subscription_tier: 'free' | 'pro' | 'enterprise'
+          subscription_tier: 'free' | 'student_pro' | 'creator_pro' | 'organization'
           templates_limit: number
           monthly_exports: number
           monthly_exports_limit: number
+          organization_id: string | null
+          is_organization_admin: boolean
         }
         Insert: {
           id: string
           email: string
-          full_name?: string | null
+          full_name: string
           avatar_url?: string | null
           created_at?: string
           updated_at?: string
-          subscription_tier?: 'free' | 'pro' | 'enterprise'
+          subscription_tier?: 'free' | 'student_pro' | 'creator_pro' | 'organization'
           templates_limit?: number
           monthly_exports?: number
           monthly_exports_limit?: number
+          organization_id?: string | null
+          is_organization_admin?: boolean
         }
         Update: {
           id?: string
           email?: string
-          full_name?: string | null
+          full_name?: string
           avatar_url?: string | null
           created_at?: string
           updated_at?: string
-          subscription_tier?: 'free' | 'pro' | 'enterprise'
+          subscription_tier?: 'free' | 'student_pro' | 'creator_pro' | 'organization'
           templates_limit?: number
           monthly_exports?: number
           monthly_exports_limit?: number
+          organization_id?: string | null
+          is_organization_admin?: boolean
         }
         Relationships: []
       }
       templates: {
         Row: {
           id: string
-          user_id: string
           name: string
           description: string | null
-          background_url: string
-          thumbnail_url: string | null
-          frames: Json
-          canvas_width: number
-          canvas_height: number
-          view_count: number
-          generation_count: number
-          is_public: boolean
           template_type: string
-          tags: string[]
+          background_url: string | null
+          frames: Json
+          tags: string[] | null
+          is_public: boolean
+          user_id: string
+          organization_id: string | null
           created_at: string
           updated_at: string
+          view_count: number
+          generation_count: number
+          is_premium: boolean
+          price: number | null
         }
         Insert: {
           id?: string
-          user_id: string
           name: string
           description?: string | null
-          background_url: string
-          thumbnail_url?: string | null
-          frames?: Json
-          canvas_width?: number
-          canvas_height?: number
-          view_count?: number
-          generation_count?: number
+          template_type: string
+          background_url?: string | null
+          frames: Json
+          tags?: string[] | null
           is_public?: boolean
-          template_type?: string
-          tags?: string[]
+          user_id: string
+          organization_id?: string | null
           created_at?: string
           updated_at?: string
+          view_count?: number
+          generation_count?: number
+          is_premium?: boolean
+          price?: number | null
         }
         Update: {
           id?: string
-          user_id?: string
           name?: string
           description?: string | null
-          background_url?: string
-          thumbnail_url?: string | null
-          frames?: Json
-          canvas_width?: number
-          canvas_height?: number
-          view_count?: number
-          generation_count?: number
-          is_public?: boolean
           template_type?: string
-          tags?: string[]
+          background_url?: string | null
+          frames?: Json
+          tags?: string[] | null
+          is_public?: boolean
+          user_id?: string
+          organization_id?: string | null
           created_at?: string
           updated_at?: string
+          view_count?: number
+          generation_count?: number
+          is_premium?: boolean
+          price?: number | null
         }
         Relationships: [
           {
@@ -144,6 +150,179 @@ export type Database = {
             referencedColumns: ["id"]
           }
         ]
+      }
+      organizations: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          logo_url: string | null
+          primary_color: string | null
+          secondary_color: string | null
+          subscription_plan: 'department' | 'church' | 'faculty' | 'enterprise'
+          subscription_status: 'active' | 'inactive' | 'cancelled' | 'trial'
+          subscription_start: string | null
+          subscription_end: string | null
+          monthly_export_limit: number
+          custom_branding: boolean
+          white_label: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          logo_url?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          subscription_plan: 'department' | 'church' | 'faculty' | 'enterprise'
+          subscription_status?: 'active' | 'inactive' | 'cancelled' | 'trial'
+          subscription_start?: string | null
+          subscription_end?: string | null
+          monthly_export_limit?: number
+          custom_branding?: boolean
+          white_label?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          logo_url?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
+          subscription_plan?: 'department' | 'church' | 'faculty' | 'enterprise'
+          subscription_status?: 'active' | 'inactive' | 'cancelled' | 'trial'
+          subscription_start?: string | null
+          subscription_end?: string | null
+          monthly_export_limit?: number
+          custom_branding?: boolean
+          white_label?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      subscriptions: {
+        Row: {
+          id: string
+          user_id: string
+          organization_id: string | null
+          plan_type: 'free' | 'student_pro' | 'creator_pro' | 'department' | 'church' | 'faculty' | 'enterprise'
+          status: 'active' | 'inactive' | 'cancelled' | 'trial'
+          current_period_start: string
+          current_period_end: string
+          cancel_at_period_end: boolean
+          paystack_subscription_id: string | null
+          paystack_customer_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          organization_id?: string | null
+          plan_type: 'free' | 'student_pro' | 'creator_pro' | 'department' | 'church' | 'faculty' | 'enterprise'
+          status?: 'active' | 'inactive' | 'cancelled' | 'trial'
+          current_period_start?: string
+          current_period_end?: string
+          cancel_at_period_end?: boolean
+          paystack_subscription_id?: string | null
+          paystack_customer_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          organization_id?: string | null
+          plan_type?: 'free' | 'student_pro' | 'creator_pro' | 'department' | 'church' | 'faculty' | 'enterprise'
+          status?: 'active' | 'inactive' | 'cancelled' | 'trial'
+          current_period_start?: string
+          current_period_end?: string
+          cancel_at_period_end?: boolean
+          paystack_subscription_id?: string | null
+          paystack_customer_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      payments: {
+        Row: {
+          id: string
+          user_id: string
+          organization_id: string | null
+          amount: number
+          currency: string
+          status: 'pending' | 'successful' | 'failed' | 'cancelled'
+          payment_method: 'mobile_money' | 'card' | 'bank_transfer'
+          paystack_reference: string
+          paystack_transaction_id: string | null
+          description: string
+          metadata: Json | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          organization_id?: string | null
+          amount: number
+          currency?: string
+          status?: 'pending' | 'successful' | 'failed' | 'cancelled'
+          payment_method?: 'mobile_money' | 'card' | 'bank_transfer'
+          paystack_reference: string
+          paystack_transaction_id?: string | null
+          description: string
+          metadata?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          organization_id?: string | null
+          amount?: number
+          currency?: string
+          status?: 'pending' | 'successful' | 'failed' | 'cancelled'
+          payment_method?: 'mobile_money' | 'card' | 'bank_transfer'
+          paystack_reference?: string
+          paystack_transaction_id?: string | null
+          description?: string
+          metadata?: Json | null
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      usage_logs: {
+        Row: {
+          id: string
+          user_id: string
+          organization_id: string | null
+          action: 'template_created' | 'template_exported' | 'font_uploaded' | 'api_call'
+          resource_id: string | null
+          metadata: Json | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          organization_id?: string | null
+          action: 'template_created' | 'template_exported' | 'font_uploaded' | 'api_call'
+          resource_id?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          organization_id?: string | null
+          action?: 'template_created' | 'template_exported' | 'font_uploaded' | 'api_call'
+          resource_id?: string | null
+          metadata?: Json | null
+          created_at?: string
+        }
       }
     }
     Views: {

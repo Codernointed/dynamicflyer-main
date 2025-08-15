@@ -197,41 +197,41 @@ Our platform offers a range of subscription tiers designed to meet the needs of 
 #### 🆓 **Free Plan**
 The Free Plan is where creativity begins to take shape. With this plan, users can create up to 3 templates per month, perfect for those just starting their design journey or with occasional needs. While exports include a subtle watermark, it's an excellent way to experience the platform's core features without any financial commitment.
 
-#### 🎓 **Student Pro (₵30/month)**
-The Student Pro plan is designed for education's creative minds. Students gain access to 20 templates per month and can export up to 100 high-resolution designs without watermarks. This affordable option empowers students to create professional-looking materials for clubs, events, and academic presentations without breaking the bank.
+#### 🎓 **Student Pro (₵50/month)**
+The Student Pro plan is designed for education's creative minds. Students gain access to 30 templates per month and can export up to 150 high-resolution designs without watermarks. This affordable option empowers students to create professional-looking materials for clubs, events, and academic presentations without breaking the bank.
 
-#### 🚀 **Creator Pro (₵60/month)**
-The Creator Pro plan is where professional content creation flourishes. With unlimited template creation, 500 monthly exports, and premium features like PDF export and custom font uploads, this plan is perfect for designers, marketers, and content creators who need powerful tools to bring their visions to life and deliver professional results to clients.
+#### 🚀 **Creator Pro (₵100/month)**
+The Creator Pro plan is where professional content creation flourishes. With unlimited template creation, 600 monthly exports, and premium features like PDF export and custom font uploads, this plan is perfect for designers, marketers, and content creators who need powerful tools to bring their visions to life and deliver professional results to clients.
 
 ### Organization Plans
 
-#### 🏢 **Department Plan (₵150/month)**
-The Department Plan transforms how teams collaborate on visual content. With 1,000 monthly exports, team collaboration features, and custom branding options, this plan helps departments maintain visual consistency while empowering multiple team members to create and modify templates within a unified workspace.
+#### 🏢 **Department Plan (₵200/month)**
+The Department Plan transforms how teams collaborate on visual content. With 1,200 monthly exports, team collaboration features, and custom branding options, this plan helps departments maintain visual consistency while empowering multiple team members to create and modify templates within a unified workspace.
 
-#### ⛪ **Church Plan (₵200/month)**
-The Church Plan is a blessing for religious organizations with diverse communication needs. With 2,000 monthly exports, specialized event packages, and bulk generation capabilities, churches can efficiently create materials for services, community events, and outreach programs while maintaining a consistent visual identity across all communications.
+#### ⛪ **Church Plan (₵300/month)**
+The Church Plan is a blessing for religious organizations with diverse communication needs. With 2,500 monthly exports, specialized event packages, and bulk generation capabilities, churches can efficiently create materials for services, community events, and outreach programs while maintaining a consistent visual identity across all communications.
 
-#### 🎓 **Faculty Plan (₵500/month)**
-The Faculty Plan is the comprehensive solution for educational institutions. With 5,000 monthly exports, multi-department access, and API integration, this plan allows faculties to centralize their design resources while giving departments the autonomy to create materials that adhere to institutional branding guidelines.
+#### 🎓 **Faculty Plan (₵600/month)**
+The Faculty Plan is the comprehensive solution for educational institutions. With 6,000 monthly exports, multi-department access, and API integration, this plan allows faculties to centralize their design resources while giving departments the autonomy to create materials that adhere to institutional branding guidelines.
 
 ### Special Event Packages
 
-#### 🎓 **Graduation Package (₵300)**
-The Graduation Package is a one-time celebration bundle that includes 500 personalized certificates, invitations, and program booklets. This package helps educational institutions create memorable graduation materials with consistent branding and personalization for each graduate.
+#### 🎓 **Graduation Package (₵400)**
+The Graduation Package is a one-time celebration bundle that includes 600 personalized certificates, invitations, and program booklets. This package helps educational institutions create memorable graduation materials with consistent branding and personalization for each graduate.
 
-#### 🎪 **Conference Package (₵500)**
-The Conference Package brings professional polish to events with 200 certificates, badges, and promotional flyers. Event organizers can create a cohesive visual experience from registration to completion, enhancing attendee experience and strengthening event branding.
+#### 🎪 **Conference Package (₵600)**
+The Conference Package brings professional polish to events with 300 certificates, badges, and promotional flyers. Event organizers can create a cohesive visual experience from registration to completion, enhancing attendee experience and strengthening event branding.
 
-#### 📚 **Semester Package (₵800)**
+#### 📚 **Semester Package (₵900)**
 The Semester Package is the ultimate academic term solution with unlimited personalization for an entire semester. Educational institutions can create all necessary materials—from course outlines to event promotions—with consistent branding and efficient bulk generation capabilities.
 
 ### Feature Comparison
 
 | Feature | Free | Student Pro | Creator Pro | Department | Church | Faculty |
 |---------|------|-------------|-------------|------------|--------|---------|
-| **Monthly Price** | ₵0 | ₵30 | ₵60 | ₵150 | ₵200 | ₵500 |
-| **Templates** | 3/month | 20/month | Unlimited | Unlimited | Unlimited | Unlimited |
-| **Exports** | 10/month | 100/month | 500/month | 1,000/month | 2,000/month | 5,000/month |
+| **Monthly Price** | ₵0 | ₵50 | ₵100 | ₵200 | ₵300 | ₵600 |
+| **Templates** | 3/month | 30/month | Unlimited | Unlimited | Unlimited | Unlimited |
+| **Exports** | 10/month | 150/month | 600/month | 1,200/month | 2,500/month | 6,000/month |
 | **High-Res Export** | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **PDF Export** | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ |
 | **Custom Fonts** | ❌ | ✅ | ✅ | ✅ | ✅ | ✅ |

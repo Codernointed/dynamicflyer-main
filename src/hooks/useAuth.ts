@@ -127,7 +127,7 @@ export function useAuth(): AuthContextType {
         
         lastSessionRef.current = session;
 
-        if (session?.user) {
+        if (session?.user && !isLoadingProfileRef.current) {
           await loadProfile(session.user);
         }
       } catch (error) {
@@ -165,8 +165,8 @@ export function useAuth(): AuthContextType {
           loading: false,
         }));
 
-        // Load profile only for relevant events
-        if (session?.user && ['SIGNED_IN', 'TOKEN_REFRESHED'].includes(event)) {
+        // Load profile only for relevant events and if not already loading
+        if (session?.user && ['SIGNED_IN', 'TOKEN_REFRESHED'].includes(event) && !isLoadingProfileRef.current) {
           await loadProfile(session.user, event === 'SIGNED_IN');
         }
         
@@ -178,33 +178,33 @@ export function useAuth(): AuthContextType {
       }
     );
     
-    // Handle tab visibility changes to refresh session if needed
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && mounted) {
-        console.log('🔄 Tab focus/visibility - checking session...');
+    // Handle tab visibility changes to refresh session if needed - DISABLED to prevent loops
+    // const handleVisibilityChange = async () => {
+    //   if (document.visibilityState === 'visible' && mounted) {
+    //     console.log('🔄 Tab focus/visibility - checking session...');
         
-        try {
-          // Only refresh if we have a user but the session might be stale
-          const { data: { session } } = await supabase.auth.getSession();
+    //     try {
+    //       // Only refresh if we have a user but the session might be stale
+    //       const { data: { session } } = await supabase.auth.getSession();
           
-          if (session?.user && !state.profile && !isLoadingProfileRef.current) {
-            console.log('🔄 Refreshing profile after tab focus');
-            await loadProfile(session.user, true);
-          }
-        } catch (error) {
-          console.warn('⚠️ Session check on tab focus failed:', error);
-        }
-      }
-    };
+    //       if (session?.user && !state.profile && !isLoadingProfileRef.current) {
+    //         console.log('🔄 Refreshing profile after tab focus');
+    //         await loadProfile(session.user, true);
+    //       }
+    //     } catch (error) {
+    //       console.warn('⚠️ Session check on tab focus failed:', error);
+    //     }
+    //   }
+    // };
     
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleVisibilityChange);
+    // document.addEventListener('visibilitychange', handleVisibilityChange);
+    // window.addEventListener('focus', handleVisibilityChange);
 
     return () => {
       mounted = false;
       subscription.unsubscribe();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleVisibilityChange);
+      // document.removeEventListener('visibilitychange', handleVisibilityChange);
+      // window.removeEventListener('focus', handleVisibilityChange);
     };
   }, [loadProfile, state.profile]);
 

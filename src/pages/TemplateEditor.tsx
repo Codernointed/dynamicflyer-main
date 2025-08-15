@@ -32,6 +32,7 @@ import EnhancedFrameToolbar from '@/components/editor/EnhancedFrameToolbar';
 import EnhancedPropertiesPanel from '@/components/editor/EnhancedPropertiesPanel';
 import { toast } from 'sonner';
 import QRCodeGenerator from '@/components/shared/QRCodeGenerator';
+import { useUsageTracking } from '@/hooks/useUsageTracking';
 
 
 
@@ -39,6 +40,7 @@ export default function TemplateEditor() {
   const { templateId } = useParams<{ templateId: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { trackTemplateCreation } = useUsageTracking();
 
   // Template state
   const [template, setTemplate] = useState<TemplateWithFrames | null>(null);
@@ -219,6 +221,12 @@ export default function TemplateEditor() {
         console.log('🆕 Creating new template...');
         savedTemplate = await createTemplate(templateData);
         console.log('✅ Template created:', savedTemplate);
+        
+        // Track template creation usage
+        if (savedTemplate.id) {
+          await trackTemplateCreation(savedTemplate.id);
+        }
+        
         toast.success('Template created successfully!');
         // Navigate to the new template ID
         navigate(`/dashboard/editor/${savedTemplate.id}`, { replace: true });

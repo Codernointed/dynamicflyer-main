@@ -22,7 +22,10 @@ import Dashboard from "./pages/Dashboard";
 import TemplateEditor from "./pages/TemplateEditor";
 import PublicGenerator from "./pages/PublicGenerator";
 import Analytics from "./pages/Analytics";
+import Subscription from "./pages/Subscription";
+import PaymentSuccess from "./pages/PaymentSuccess";
 import FontManager from "./components/dashboard/FontManager";
+import DownloadLimitManager from "./components/dashboard/DownloadLimitManager";
 
 // Dashboard Layout
 import DashboardLayout from "./components/dashboard/DashboardLayout";
@@ -141,7 +144,13 @@ const App = () => {
                 <Route path="editor/:templateId" element={<TemplateEditor />} />
                 <Route path="analytics" element={<Analytics />} />
                 <Route path="fonts" element={<FontManager />} />
+                <Route path="downloads" element={<DownloadLimitManager />} />
+                <Route path="subscription" element={<Subscription />} />
               </Route>
+
+              {/* Payment Routes */}
+              <Route path="/subscription" element={<Subscription />} />
+              <Route path="/dashboard/subscription/success" element={<PaymentSuccess />} />
 
               {/* Public Flyer Generator */}
               <Route 

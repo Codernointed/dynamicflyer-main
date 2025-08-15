@@ -20,6 +20,7 @@ import {
   getFontPreviewText,
   getAvailableFonts
 } from '@/lib/fontUtils';
+import { FeatureGate } from '@/components/shared/FeatureGate';
 
 export default function FontManager() {
   const [customFonts, setCustomFonts] = useState<CustomFont[]>([]);
@@ -95,10 +96,12 @@ export default function FontManager() {
           <h1 className="text-3xl font-bold text-gray-900">Font Manager</h1>
           <p className="text-gray-600 mt-1">Upload and manage custom fonts for your templates</p>
         </div>
-        <Button onClick={() => fileInputRef.current?.click()}>
-          <Plus className="mr-2 h-4 w-4" />
-          Upload Font
-        </Button>
+        <FeatureGate feature="upload_font">
+          <Button onClick={() => fileInputRef.current?.click()}>
+            <Plus className="mr-2 h-4 w-4" />
+            Upload Font
+          </Button>
+        </FeatureGate>
       </div>
 
       <input

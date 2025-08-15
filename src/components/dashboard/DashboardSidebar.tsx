@@ -17,7 +17,8 @@ import {
   BarChart3,
   X,
   Sparkles,
-  Type
+  Type,
+  Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -41,6 +42,8 @@ const navigationItems = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutTemplate },
   { name: 'Analytics', href: '/dashboard/analytics', icon: BarChart3 },
   { name: 'Fonts', href: '/dashboard/fonts', icon: Type },
+  { name: 'Downloads', href: '/dashboard/downloads', icon: Download },
+  { name: 'Subscription', href: '/dashboard/subscription', icon: CreditCard },
 ];
 
 export default function DashboardSidebar({ onClose }: DashboardSidebarProps) {

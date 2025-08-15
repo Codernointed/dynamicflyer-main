@@ -10,6 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { ZoomIn, ZoomOut, RotateCcw, Download, Move, Square, Circle, Type, Image as ImageIcon, Plus, Trash2, Grid3X3, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { drawBackgroundImage } from '@/lib/imageUtils';
+import { FeatureGate } from '@/components/shared/FeatureGate';
 
 export interface FrameData {
   id: string;
@@ -76,6 +77,7 @@ export default function EnhancedCanvasEditor({
   const [isLoading, setIsLoading] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
+
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
     isResizing: false,
@@ -1164,14 +1166,16 @@ export default function EnhancedCanvasEditor({
           <div className="text-xs text-gray-500">
             <span className="hidden sm:inline">Arrow keys: Move • Ctrl+R: Rotate • Ctrl+Shift+R: Rotate CCW • Ctrl+0: Reset • Delete: Remove • Alt: Precise • Ctrl: Free</span>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExport}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Export
-          </Button>
+          <FeatureGate feature="export_template">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExport}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+          </FeatureGate>
         </div>
       </div>
     </Card>

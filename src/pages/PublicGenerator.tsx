@@ -20,7 +20,8 @@ import {
   Save,
   RefreshCw,
   FileText,
-  Edit
+  Edit,
+  BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,10 +30,12 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
-import { getPublicTemplate } from '@/lib/supabase';
+import { getPublicTemplate, trackTemplateGeneration } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Template, TemplateWithFrames } from '@/integrations/supabase/types';
 import { uploadImage } from '@/lib/supabase';
 import { exportCanvasToPDF, getPDFExportOptions } from '@/lib/pdfUtils';
+import { addWatermarkToCanvas, shouldApplyWatermark } from '@/lib/watermark';
 import { getAvailableFonts, applyFontToContext } from '@/lib/fontUtils';
 import { drawBackgroundImage, loadImage, cropImageToFrame, createCroppedCanvas } from '@/lib/imageUtils';
 import ImageEditorModal from '@/components/ImageEditorModal';
@@ -78,6 +81,9 @@ export default function PublicGenerator() {
   const [backgroundUrl, setBackgroundUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [downloadCount, setDownloadCount] = useState<number>(0);
+  const [creatorName, setCreatorName] = useState<string>('');
+  const [subscriptionTier, setSubscriptionTier] = useState<string>('free');
 
   // User data state
   const [userData, setUserData] = useState<UserData>({});
@@ -166,12 +172,33 @@ export default function PublicGenerator() {
         setTemplate(templateData);
         setBackgroundUrl(templateData.background_url || '');
         
+        // Set download count from template data
+        if (templateData.generation_count) {
+          setDownloadCount(templateData.generation_count);
+        }
+        
         if (templateData.frames && Array.isArray(templateData.frames)) {
           setFrames(templateData.frames as FrameData[]);
           console.log('Frames loaded:', templateData.frames.length);
         } else {
           console.log('No frames found in template');
           setFrames([]);
+        }
+        
+        // Try to get creator name if available
+        try {
+          const { data: userData, error: userError } = await supabase
+            .from('profiles')
+            .select('full_name, subscription_tier')
+            .eq('id', templateData.user_id)
+            .single();
+            
+          if (userData && !userError) {
+            setCreatorName(userData.full_name || 'Anonymous Creator');
+            setSubscriptionTier(userData.subscription_tier || 'free');
+          }
+        } catch (userError) {
+          console.warn('Failed to fetch creator info:', userError);
         }
 
         // Generate share link
@@ -544,7 +571,21 @@ export default function PublicGenerator() {
       // Create cropped canvas to remove white space
       const croppedCanvas = createCroppedCanvas(exportCanvas, bgImage);
       
-      const dataURL = croppedCanvas.toDataURL('image/png', 1.0);
+      // Apply watermark if free tier
+      const finalCanvas = shouldApplyWatermark(subscriptionTier) ? 
+        addWatermarkToCanvas(croppedCanvas, 'free', creatorName) : croppedCanvas;
+      
+      const dataURL = finalCanvas.toDataURL('image/png', 1.0);
+      
+      // Track download for analytics
+      if (template?.id) {
+        try {
+          await trackTemplateGeneration(template.id);
+          setDownloadCount(prev => prev + 1);
+        } catch (error) {
+          console.error('Failed to track download:', error);
+        }
+      }
       
       const link = document.createElement('a');
       link.download = `${template?.name || 'design'}-personalized.png`;
@@ -802,11 +843,21 @@ export default function PublicGenerator() {
                   {template.description && (
                     <p className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-2">{template.description}</p>
                   )}
+                  {/* {creatorName && (
+                    <div className="flex items-center mt-1">
+                      <span className="text-xs text-gray-600">Created by</span>
+                      <span className="text-xs font-medium text-amber-700 ml-1">{creatorName}</span>
+                    </div>
+                  )} */}
                 </div>
             </div>
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center mr-3">
+              <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600 mr-1" />
+              <span className="text-xs font-medium text-amber-700">{downloadCount} downloads</span>
+            </div>
             <Button
               variant="outline"
               size="sm"
@@ -1042,6 +1093,13 @@ export default function PublicGenerator() {
                 </div>
               )}
               </CardContent>
+              
+              {creatorName && (
+                    <div className="flex items-center justify-center mt-1">
+                      <span className="text-xs text-gray-600">Created by</span>
+                      <span className="text-xs font-medium text-amber-700 ml-1">{creatorName}</span>
+                    </div>
+                  )}
             </Card>
 
             {/* Action Buttons */}
