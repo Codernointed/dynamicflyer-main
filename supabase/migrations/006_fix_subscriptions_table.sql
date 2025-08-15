@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS subscriptions (
   cancel_at_period_end BOOLEAN DEFAULT false,
   paystack_subscription_id TEXT,
   paystack_customer_id TEXT,
+  paystack_reference TEXT, -- Added missing column
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -38,6 +39,7 @@ CREATE POLICY "Users can update their own subscriptions" ON subscriptions
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_subscriptions_user_id ON subscriptions(user_id);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_paystack_reference ON subscriptions(paystack_reference);
 
 -- Grant necessary permissions
 GRANT ALL ON subscriptions TO authenticated;

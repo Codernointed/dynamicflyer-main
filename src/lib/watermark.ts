@@ -98,7 +98,7 @@ export function addWatermarkToCanvas(
   watermarkedCtx.drawImage(canvas, 0, 0);
 
   // Apply watermark
-  applyWatermark(watermarkedCtx, text, watermark, canvas.width, canvas.height);
+  applyWatermark(watermarkedCtx, text, watermark as WatermarkConfig, canvas.width, canvas.height);
 
   return watermarkedCanvas;
 }

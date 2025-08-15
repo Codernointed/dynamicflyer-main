@@ -108,10 +108,14 @@ export function useAuth(): AuthContextType {
    */
   useEffect(() => {
     let mounted = true;
+    let hasInitialized = false;
     
     // Get initial session
     const getInitialSession = async () => {
       try {
+        if (hasInitialized) return; // Prevent multiple initializations
+        hasInitialized = true;
+        
         const { data: { session } } = await supabase.auth.getSession();
         
         if (!mounted) return;
@@ -145,14 +149,22 @@ export function useAuth(): AuthContextType {
       async (event, session) => {
         if (!mounted) return;
         
-        console.log('🔄 Auth state changed:', event, session?.user?.email || 'No user');
+        // Only log important events to reduce console spam
+        if (['SIGNED_IN', 'SIGNED_OUT', 'TOKEN_REFRESHED'].includes(event)) {
+          console.log('🔄 Auth state changed:', event, session?.user?.email || 'No user');
+        }
         
         // Check if this is a duplicate session event
         const isDuplicateSession = lastSessionRef.current?.access_token === session?.access_token &&
                                    lastSessionRef.current?.user?.id === session?.user?.id;
         
         if (isDuplicateSession && event !== 'SIGNED_OUT') {
-          console.log('⏭️ Skipping duplicate session event');
+          // console.log('⏭️ Skipping duplicate session event'); // Reduce console spam
+          return;
+        }
+        
+        // Skip INITIAL_SESSION events to prevent loops
+        if (event === 'INITIAL_SESSION') {
           return;
         }
         
@@ -166,8 +178,8 @@ export function useAuth(): AuthContextType {
         }));
 
         // Load profile only for relevant events and if not already loading
-        if (session?.user && ['SIGNED_IN', 'TOKEN_REFRESHED'].includes(event) && !isLoadingProfileRef.current) {
-          await loadProfile(session.user, event === 'SIGNED_IN');
+        if (session?.user && event === 'SIGNED_IN' && !isLoadingProfileRef.current) {
+          await loadProfile(session.user, true);
         }
         
         // Clear profile when user signs out

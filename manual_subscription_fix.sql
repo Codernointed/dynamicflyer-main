@@ -1,0 +1,49 @@
+-- Manual subscription fix for user who already paid
+-- Run this in your Supabase SQL Editor to manually update subscription
+
+-- First, find your user ID (replace with your email)
+-- SELECT id, email FROM auth.users WHERE email = 'botchweypaul01@gmail.com';
+
+-- Update profile subscription tier manually (replace USER_ID with actual ID from above query)
+-- UPDATE profiles 
+-- SET 
+--   subscription_tier = 'creator_pro',  -- or whatever plan you paid for
+--   templates_limit = 100,              -- creator_pro limits
+--   monthly_exports_limit = 2000,       -- creator_pro limits
+--   updated_at = NOW()
+-- WHERE id = 'YOUR_USER_ID_HERE';
+
+-- Create manual subscription record
+-- INSERT INTO subscriptions (
+--   user_id,
+--   plan_type,
+--   status,
+--   current_period_start,
+--   current_period_end,
+--   cancel_at_period_end
+-- ) VALUES (
+--   'YOUR_USER_ID_HERE',  -- replace with actual user ID
+--   'creator_pro',        -- or whatever plan you paid for
+--   'active',
+--   NOW(),
+--   NOW() + INTERVAL '1 month',
+--   false
+-- ) ON CONFLICT (user_id) DO UPDATE SET
+--   plan_type = EXCLUDED.plan_type,
+--   status = EXCLUDED.status,
+--   current_period_start = EXCLUDED.current_period_start,
+--   current_period_end = EXCLUDED.current_period_end,
+--   updated_at = NOW();
+
+-- Verify the changes
+-- SELECT 
+--   p.email,
+--   p.subscription_tier,
+--   p.templates_limit,
+--   p.monthly_exports_limit,
+--   s.plan_type,
+--   s.status,
+--   s.current_period_end
+-- FROM profiles p
+-- LEFT JOIN subscriptions s ON p.id = s.user_id
+-- WHERE p.email = 'botchweypaul01@gmail.com';

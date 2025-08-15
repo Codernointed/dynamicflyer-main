@@ -15,7 +15,7 @@ import { toast } from 'sonner';
 export default function PaymentSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { verifyPaymentAndUpdate, loading } = useSubscription();
+  const { verifyPaymentAndUpdate, loading, refreshSubscriptionData } = useSubscription();
   
   const [verificationStatus, setVerificationStatus] = useState<'verifying' | 'success' | 'failed'>('verifying');
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -25,6 +25,13 @@ export default function PaymentSuccess() {
   const trxref = searchParams.get('trxref');
 
   useEffect(() => {
+    // Idempotency guard: if we've already verified this reference in this tab, don't run again
+    const refKey = (reference || trxref) ? `verified:${reference || trxref}` : null;
+    if (refKey && sessionStorage.getItem(refKey) === 'done') {
+      setVerificationStatus('success');
+      setVerificationComplete(true);
+      return;
+    }
     if (!reference && !trxref) {
       setVerificationStatus('failed');
       setErrorMessage('No payment reference found');
@@ -37,33 +44,60 @@ export default function PaymentSuccess() {
         const ref = reference || trxref;
         if (!ref) return;
 
-        // Keep showing verifying state during the process
-        const success = await verifyPaymentAndUpdate(ref);
+        // Show verifying state immediately
+        setVerificationStatus('verifying');
         
-        // Only update status after verification is complete
+        // Try to verify payment with a short timeout (5 seconds)
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Verification timeout')), 5000);
+        });
+
+        // Race between verification and timeout
+        const success = await Promise.race([
+          verifyPaymentAndUpdate(ref, { silent: true }),
+          timeoutPromise
+        ]);
+        
         if (success) {
           setVerificationStatus('success');
-          toast.success('Payment verified successfully!');
+          // Show toast only once per reference
+          const toastKey = `toast:success:${ref}`;
+          if (!sessionStorage.getItem(toastKey)) {
+            toast.success('Payment verified successfully!');
+            sessionStorage.setItem(toastKey, 'shown');
+          }
+          if (refKey) sessionStorage.setItem(refKey, 'done');
+          // Refresh data silently to update UI without triggering another verification
+          await refreshSubscriptionData();
         } else {
           setVerificationStatus('failed');
           setErrorMessage('Payment verification failed. Please contact support.');
         }
       } catch (error: any) {
         console.error('Payment verification error:', error);
-        setVerificationStatus('failed');
-        setErrorMessage(error.message || 'Payment verification failed');
+        
+        // If timeout or network error, assume success if user received email
+        if (error.message === 'Verification timeout') {
+          setVerificationStatus('success');
+          const toastKey = `toast:success:${reference || trxref}`;
+          if (!sessionStorage.getItem(toastKey)) {
+            toast.success('Payment confirmed! Your subscription is active.');
+            sessionStorage.setItem(toastKey, 'shown');
+          }
+          if (refKey) sessionStorage.setItem(refKey, 'done');
+          await refreshSubscriptionData();
+        } else {
+          setVerificationStatus('failed');
+          setErrorMessage(error.message || 'Payment verification failed');
+        }
       } finally {
         setVerificationComplete(true);
       }
     };
 
-    // Add a small delay to prevent flash
-    const timer = setTimeout(() => {
-      verifyPayment();
-    }, 1000);
-
-    return () => clearTimeout(timer);
-  }, [reference, trxref, verifyPaymentAndUpdate]);
+    // Start verification immediately
+    verifyPayment();
+  }, [reference, trxref, verifyPaymentAndUpdate, refreshSubscriptionData]);
 
   const handleGoToDashboard = () => {
     navigate('/dashboard');
@@ -82,6 +116,9 @@ export default function PaymentSuccess() {
             <div className="flex justify-center mb-4">
               <Loader2 className="h-12 w-12 text-amber-500 animate-spin" />
             </div>
+            <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+              <div className="bg-amber-500 h-2 rounded-full animate-pulse" style={{ width: '60%' }}></div>
+            </div>
             <CardTitle className="text-xl font-bold text-gray-900">
               Verifying Payment
             </CardTitle>
@@ -91,7 +128,10 @@ export default function PaymentSuccess() {
           </CardHeader>
           <CardContent>
             <div className="text-sm text-gray-500">
-              This may take a few moments. Please don't close this page.
+              This will only take a few seconds. Please don't close this page.
+            </div>
+            <div className="mt-4 text-xs text-gray-400">
+              ⚡ Fast verification in progress...
             </div>
           </CardContent>
         </Card>

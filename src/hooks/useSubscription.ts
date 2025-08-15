@@ -275,7 +275,7 @@ export function useSubscription() {
   /**
    * Verify payment and update subscription
    */
-  const verifyPaymentAndUpdate = useCallback(async (reference: string) => {
+  const verifyPaymentAndUpdate = useCallback(async (reference: string, options?: { silent?: boolean }) => {
     if (!user) return false;
 
     try {
@@ -294,14 +294,17 @@ export function useSubscription() {
           await updateUserSubscription(planId, reference);
           // Force refresh of subscription data
           await refreshSubscriptionData();
-          // Force refresh of auth profile (to trigger UI updates)
-          window.location.reload();
-          toast.success('Subscription upgraded successfully!');
+          // Optional success toast (disabled when called with silent)
+          if (!options?.silent) {
+            toast.success('Subscription upgraded successfully!');
+          }
           return true;
         } else if (packageId) {
           // Process event package purchase
           await processEventPackagePurchase(packageId, reference);
-          toast.success('Event package purchased successfully!');
+          if (!options?.silent) {
+            toast.success('Event package purchased successfully!');
+          }
           return true;
         }
       } else {

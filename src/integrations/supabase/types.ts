@@ -216,6 +216,7 @@ export interface Database {
           cancel_at_period_end: boolean
           paystack_subscription_id: string | null
           paystack_customer_id: string | null
+          paystack_reference: string | null
           created_at: string
           updated_at: string
         }
@@ -230,6 +231,7 @@ export interface Database {
           cancel_at_period_end?: boolean
           paystack_subscription_id?: string | null
           paystack_customer_id?: string | null
+          paystack_reference?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -244,6 +246,7 @@ export interface Database {
           cancel_at_period_end?: boolean
           paystack_subscription_id?: string | null
           paystack_customer_id?: string | null
+          paystack_reference?: string | null
           created_at?: string
           updated_at?: string
         }

@@ -201,18 +201,18 @@ The Free Plan is where creativity begins to take shape. With this plan, users ca
 The Student Pro plan is designed for education's creative minds. Students gain access to 30 templates per month and can export up to 150 high-resolution designs without watermarks. This affordable option empowers students to create professional-looking materials for clubs, events, and academic presentations without breaking the bank.
 
 #### 🚀 **Creator Pro (₵100/month)**
-The Creator Pro plan is where professional content creation flourishes. With unlimited template creation, 600 monthly exports, and premium features like PDF export and custom font uploads, this plan is perfect for designers, marketers, and content creators who need powerful tools to bring their visions to life and deliver professional results to clients.
+The Creator Pro plan is where professional content creation flourishes. With unlimited template creation, 400 monthly exports, and premium features like PDF export and custom font uploads, this plan is perfect for designers, marketers, and content creators who need powerful tools to bring their visions to life and deliver professional results to clients.
 
 ### Organization Plans
 
 #### 🏢 **Department Plan (₵200/month)**
-The Department Plan transforms how teams collaborate on visual content. With 1,200 monthly exports, team collaboration features, and custom branding options, this plan helps departments maintain visual consistency while empowering multiple team members to create and modify templates within a unified workspace.
+The Department Plan transforms how teams collaborate on visual content. With 600 monthly exports, team collaboration features, and custom branding options, this plan helps departments maintain visual consistency while empowering multiple team members to create and modify templates within a unified workspace.
 
 #### ⛪ **Church Plan (₵300/month)**
-The Church Plan is a blessing for religious organizations with diverse communication needs. With 2,500 monthly exports, specialized event packages, and bulk generation capabilities, churches can efficiently create materials for services, community events, and outreach programs while maintaining a consistent visual identity across all communications.
+The Church Plan is a blessing for religious organizations with diverse communication needs. With 1000 monthly exports, specialized event packages, and bulk generation capabilities, churches can efficiently create materials for services, community events, and outreach programs while maintaining a consistent visual identity across all communications.
 
 #### 🎓 **Faculty Plan (₵600/month)**
-The Faculty Plan is the comprehensive solution for educational institutions. With 6,000 monthly exports, multi-department access, and API integration, this plan allows faculties to centralize their design resources while giving departments the autonomy to create materials that adhere to institutional branding guidelines.
+The Faculty Plan is the comprehensive solution for educational institutions. With 2000 monthly exports, multi-department access, and API integration, this plan allows faculties to centralize their design resources while giving departments the autonomy to create materials that adhere to institutional branding guidelines.
 
 ### Special Event Packages
 
