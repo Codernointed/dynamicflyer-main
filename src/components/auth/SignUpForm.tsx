@@ -81,6 +81,9 @@ export default function SignUpForm({ onSuccess }: SignUpFormProps) {
 
     try {
       await signUp(formData.email, formData.password, formData.fullName);
+      // After initiating signup, guide user to check email page
+      const params = new URLSearchParams({ email: formData.email });
+      window.location.href = `/auth/check-email?${params.toString()}`;
       onSuccess?.();
     } catch (error) {
       // Error is handled by the useAuth hook

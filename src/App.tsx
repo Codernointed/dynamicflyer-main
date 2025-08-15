@@ -16,6 +16,8 @@ import NotFound from "./pages/NotFound";
 // V2 Auth Pages
 import LoginPage from "./pages/auth/LoginPage";
 import SignUpPage from "./pages/auth/SignUpPage";
+import CheckEmailPage from "./pages/auth/CheckEmailPage";
+import ConfirmEmailPage from "./pages/auth/ConfirmEmailPage";
 
 // V2 Dashboard Pages (to be created)
 import Dashboard from "./pages/Dashboard";
@@ -130,6 +132,8 @@ const App = () => {
                   </ProtectedRoute>
                 } 
               />
+              <Route path="/auth/check-email" element={<CheckEmailPage />} />
+              <Route path="/auth/confirm" element={<ConfirmEmailPage />} />
 
               {/* Protected Dashboard Routes */}
               <Route 
