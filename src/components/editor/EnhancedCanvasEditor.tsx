@@ -7,7 +7,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { ZoomIn, ZoomOut, RotateCcw, Download, Move, Square, Circle, Type, Image as ImageIcon, Plus, Trash2, Grid3X3, Eye, EyeOff } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Download, Move, Square, Circle, Type, Image as ImageIcon, Plus, Trash2, Grid3X3, Eye, EyeOff, Hand, MousePointer2, Copy, Lock, Unlock, ChevronUp, ChevronDown, MoveUp, MoveDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { drawBackgroundImage } from '@/lib/imageUtils';
 import { FeatureGate } from '@/components/shared/FeatureGate';
@@ -23,6 +23,8 @@ export interface FrameData {
   shape: 'rectangle' | 'circle' | 'rounded-rectangle' | 'polygon';
   cornerRadius?: number;
   polygonSides?: number; // Number of sides for polygon (6 = hexagon, 8 = octagon, etc.)
+  visible?: boolean;
+  locked?: boolean;
   properties?: {
     fontSize?: number;
     fontFamily?: string;
@@ -38,26 +40,37 @@ interface CanvasEditorProps {
   frames: FrameData[];
   selectedFrameId: string | null;
   onFramesChange?: (frames: FrameData[]) => void;
+  onFramesChangeEnd?: (frames: FrameData[]) => void;
   onFrameSelect: (frameId: string | null) => void;
   onCanvasReady: (ready: boolean) => void;
   readOnly?: boolean;
+  externalZoom?: number;
+  onZoomChange?: (zoom: number) => void;
+  interactionMode?: 'select' | 'pan';
+  onInteractionModeChange?: (mode: 'select' | 'pan') => void;
+  showGrid?: boolean;
+  onShowGridChange?: (show: boolean) => void;
+  showGuides?: boolean;
+  onShowGuidesChange?: (show: boolean) => void;
 }
 
 interface DragState {
   isDragging: boolean;
   isResizing: boolean;
   isRotating: boolean;
+  isPanning: boolean;
   isCreating: boolean;
   startX: number;
   startY: number;
   startFrame: FrameData | null;
+  startPan: { x: number; y: number } | null;
   resizeHandle: 'nw' | 'ne' | 'sw' | 'se' | 'n' | 's' | 'e' | 'w' | null;
   createType: 'image' | 'text' | null;
   createShape: 'rectangle' | 'circle' | 'rounded-rectangle';
 }
 
-const RESIZE_HANDLE_SIZE = 8;
-const ROTATION_HANDLE_DISTANCE = 30;
+const RESIZE_HANDLE_BASE_SIZE = 8;
+const ROTATION_HANDLE_BASE_DISTANCE = 30;
 const SNAP_THRESHOLD = 10;
 const GRID_SIZE = 10;
 const SNAP_DISTANCE = 10;
@@ -68,31 +81,72 @@ export default function EnhancedCanvasEditor({
   frames,
   selectedFrameId,
   onFramesChange,
+  onFramesChangeEnd,
   onFrameSelect,
   onCanvasReady,
   readOnly = false,
+  externalZoom,
+  onZoomChange,
+  interactionMode: externalInteractionMode,
+  onInteractionModeChange,
+  showGrid: externalShowGrid,
+  onShowGridChange,
+  showGuides: externalShowGuides,
+  onShowGuidesChange,
 }: CanvasEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [zoom, setZoom] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [zoom, setInternalZoom] = useState(1);
+  
+  // Sync internal zoom with external if provided
+  useEffect(() => {
+    if (externalZoom !== undefined && externalZoom !== zoom) {
+      setInternalZoom(externalZoom);
+    }
+  }, [externalZoom]);
+
+  const setZoom = useCallback((newZoom: number | ((prev: number) => number)) => {
+    setInternalZoom(prev => {
+      const updated = typeof newZoom === 'function' ? newZoom(prev) : newZoom;
+      onZoomChange?.(updated);
+      return updated;
+    });
+  }, [onZoomChange]);
+  const [displayScale, setDisplayScale] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
   const [canvasSize, setCanvasSize] = useState({ width: 1200, height: 800 });
   const [backgroundImage, setBackgroundImage] = useState<HTMLImageElement | null>(null);
+
+  const [internalInteractionMode, setInternalInteractionMode] = useState<'select' | 'pan'>('select');
+  const interactionMode = externalInteractionMode !== undefined ? externalInteractionMode : internalInteractionMode;
+  
+  const setInteractionMode = useCallback((mode: 'select' | 'pan') => {
+    setInternalInteractionMode(mode);
+    onInteractionModeChange?.(mode);
+  }, [onInteractionModeChange]);
+
+  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
 
   const [dragState, setDragState] = useState<DragState>({
     isDragging: false,
     isResizing: false,
     isRotating: false,
+    isPanning: false,
     isCreating: false,
     startX: 0,
     startY: 0,
     startFrame: null,
+    startPan: null,
     resizeHandle: null,
     createType: null,
     createShape: 'rectangle',
   });
   const [snapLines, setSnapLines] = useState<{ x?: number; y?: number; type: 'horizontal' | 'vertical' }[]>([]);
-  const [showGrid, setShowGrid] = useState(false);
-  const [showGuides, setShowGuides] = useState(true);
+  const [internalShowGrid, setInternalShowGrid] = useState(false);
+  const showGrid = externalShowGrid !== undefined ? externalShowGrid : internalShowGrid;
+  
+  const [internalShowGuides, setInternalShowGuides] = useState(true);
+  const showGuides = externalShowGuides !== undefined ? externalShowGuides : internalShowGuides;
   const [fineGrid, setFineGrid] = useState(false);
   const [rotationInput, setRotationInput] = useState<string>('');
 
@@ -116,54 +170,86 @@ export default function EnhancedCanvasEditor({
     return Math.round(value / currentGridSize) * currentGridSize;
   };
 
-  const snapToFrame = (x: number, y: number, excludeFrameId?: string): { x: number; y: number; snapLines: { x?: number; y?: number; type: 'horizontal' | 'vertical' }[] } => {
+  const snapToFrame = (x: number, y: number, width: number, height: number, excludeFrameId?: string): { x: number; y: number; snapLines: { x?: number; y?: number; type: 'horizontal' | 'vertical' }[] } => {
     let snappedX = x;
     let snappedY = y;
     const lines: { x?: number; y?: number; type: 'horizontal' | 'vertical' }[] = [];
     
+    // Bounds of the frame being dragged
+    const dragLeft = x;
+    const dragRight = x + width;
+    const dragTop = y;
+    const dragBottom = y + height;
+    const dragCenterX = x + width / 2;
+    const dragCenterY = y + height / 2;
+
     frames.forEach(frame => {
-      if (frame.id === excludeFrameId) return;
+      if (frame.id === excludeFrameId || frame.visible === false) return;
       
-      const frameLeft = frame.x;
-      const frameRight = frame.x + frame.width;
-      const frameTop = frame.y;
-      const frameBottom = frame.y + frame.height;
-      const frameCenterX = frame.x + frame.width / 2;
-      const frameCenterY = frame.y + frame.height / 2;
+      const fLeft = frame.x;
+      const fRight = frame.x + frame.width;
+      const fTop = frame.y;
+      const fBottom = frame.y + frame.height;
+      const fCenterX = frame.x + frame.width / 2;
+      const fCenterY = frame.y + frame.height / 2;
       
-      // Horizontal snapping
-      if (Math.abs(x - frameLeft) < SNAP_DISTANCE) {
-        snappedX = frameLeft;
-        lines.push({ x: frameLeft, type: 'vertical' });
+      // Vertical Snapping (X axis)
+      const xSnapPoints = [
+        { v: fLeft, label: 'left' },
+        { v: fRight, label: 'right' },
+        { v: fCenterX, label: 'center' }
+      ];
+      const dragXPoints = [
+        { v: dragLeft, offset: 0 },
+        { v: dragRight, offset: -width },
+        { v: dragCenterX, offset: -width / 2 }
+      ];
+
+      for (const fPoint of xSnapPoints) {
+        for (const dPoint of dragXPoints) {
+          if (Math.abs(dPoint.v - fPoint.v) < SNAP_THRESHOLD) {
+            snappedX = fPoint.v + dPoint.offset;
+            lines.push({ x: fPoint.v, type: 'vertical' });
+          }
+        }
       }
-      if (Math.abs(x - frameRight) < SNAP_DISTANCE) {
-        snappedX = frameRight;
-        lines.push({ x: frameRight, type: 'vertical' });
-      }
-      if (Math.abs(x - frameCenterX) < SNAP_DISTANCE) {
-        snappedX = frameCenterX;
-        lines.push({ x: frameCenterX, type: 'vertical' });
-      }
-      
-      // Vertical snapping
-      if (Math.abs(y - frameTop) < SNAP_DISTANCE) {
-        snappedY = frameTop;
-        lines.push({ y: frameTop, type: 'horizontal' });
-      }
-      if (Math.abs(y - frameBottom) < SNAP_DISTANCE) {
-        snappedY = frameBottom;
-        lines.push({ y: frameBottom, type: 'horizontal' });
-      }
-      if (Math.abs(y - frameCenterY) < SNAP_DISTANCE) {
-        snappedY = frameCenterY;
-        lines.push({ y: frameCenterY, type: 'horizontal' });
+
+      // Horizontal Snapping (Y axis)
+      const ySnapPoints = [
+        { v: fTop, label: 'top' },
+        { v: fBottom, label: 'bottom' },
+        { v: fCenterY, label: 'center' }
+      ];
+      const dragYPoints = [
+        { v: dragTop, offset: 0 },
+        { v: dragBottom, offset: -height },
+        { v: dragCenterY, offset: -height / 2 }
+      ];
+
+      for (const fPoint of ySnapPoints) {
+        for (const dPoint of dragYPoints) {
+          if (Math.abs(dPoint.v - fPoint.v) < SNAP_THRESHOLD) {
+            snappedY = fPoint.v + dPoint.offset;
+            lines.push({ y: fPoint.v, type: 'horizontal' });
+          }
+        }
       }
     });
+
+    // Canvas Center Snapping
+    if (Math.abs(dragCenterX - canvasSize.width / 2) < SNAP_THRESHOLD) {
+      snappedX = canvasSize.width / 2 - width / 2;
+      lines.push({ x: canvasSize.width / 2, type: 'vertical' });
+    }
+    if (Math.abs(dragCenterY - canvasSize.height / 2) < SNAP_THRESHOLD) {
+      snappedY = canvasSize.height / 2 - height / 2;
+      lines.push({ y: canvasSize.height / 2, type: 'horizontal' });
+    }
     
     return { x: snappedX, y: snappedY, snapLines: lines };
   };
 
-  const snapPosition = (x: number, y: number, excludeFrameId?: string, useGrid: boolean = true): { x: number; y: number; snapLines: { x?: number; y?: number; type: 'horizontal' | 'vertical' }[] } => {
+  const snapPosition = (x: number, y: number, width: number, height: number, excludeFrameId?: string, useGrid: boolean = true): { x: number; y: number; snapLines: { x?: number; y?: number; type: 'horizontal' | 'vertical' }[] } => {
     let snappedX = x;
     let snappedY = y;
     
@@ -173,7 +259,7 @@ export default function EnhancedCanvasEditor({
       snappedY = snapToGrid(y);
     }
     
-    const frameSnap = snapToFrame(snappedX, snappedY, excludeFrameId);
+    const frameSnap = snapToFrame(snappedX, snappedY, width, height, excludeFrameId);
     
     return frameSnap;
   };
@@ -186,15 +272,51 @@ export default function EnhancedCanvasEditor({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size - preserve aspect ratio of background
-    const width = 1200;
-    const height = 800;
-    setCanvasSize({ width, height });
-    canvas.width = width;
-    canvas.height = height;
+    // Fixed internal template dimensions
+    const baseWidth = 1200;
+    const baseHeight = 800;
+    setCanvasSize({ width: baseWidth, height: baseHeight });
+
+    // Account for High-DPI displays (mobile, retina)
+    const dpr = window.devicePixelRatio || 1;
+    
+    // Set internal resolution
+    canvas.width = baseWidth * dpr;
+    canvas.height = baseHeight * dpr;
+
+    // Scale context to match DPR
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     onCanvasReady(true);
+    setIsLoading(false);
+    renderCanvas();
   }, [onCanvasReady]);
+
+  // Handle container resizing for responsive scaling
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      if (!entries[0]) return;
+      const { width, height } = entries[0].contentRect;
+      
+      // Safety guard: ignore tiny or zero dimensions which occur during transitions or initial loads
+      if (width < 100 || height < 100) return;
+
+      // Calculate scale to fit 1200x800 in the available space with padding
+      const padding = 64; 
+      const scaleX = (width - padding) / 1200;
+      const scaleY = (height - padding) / 800;
+      
+      // Use the smaller scale to ensure it fits both ways and preserves aspect ratio
+      // Set a minimum floor (0.2) to prevent the "tiny dot" issue at low resolutions
+      const newScale = Math.max(0.2, Math.min(scaleX, scaleY, 1)); 
+      setDisplayScale(newScale);
+    });
+
+    resizeObserver.observe(containerRef.current);
+    return () => resizeObserver.disconnect();
+  }, []);
 
   // Initialize on mount
   useEffect(() => {
@@ -252,9 +374,11 @@ export default function EnhancedCanvasEditor({
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Apply zoom
+    // Apply viewport transformations
     ctx.save();
-    ctx.scale(zoom, zoom);
+    // Note: Internal scaling is now handled by the container DIV's CSS transform or width/height
+    // We only apply internal panning offset here
+    ctx.translate(panOffset.x, panOffset.y);
 
     // Draw grid
     if (showGrid && zoom > 0.5) {
@@ -286,7 +410,8 @@ export default function EnhancedCanvasEditor({
     }
 
     // Draw frames
-    frames.forEach(frame => {
+    [...frames].forEach((frame, index) => {
+      if (frame.visible === false) return;
       drawFrame(ctx, frame, frame.id === selectedFrameId);
     });
 
@@ -312,7 +437,12 @@ export default function EnhancedCanvasEditor({
     }
 
     ctx.restore();
-  }, [frames, selectedFrameId, backgroundImage, canvasSize, zoom, showGrid, showGuides, snapLines, fineGrid]);
+  }, [frames, selectedFrameId, backgroundImage, canvasSize, zoom, panOffset, showGrid, showGuides, snapLines, fineGrid]);
+
+  // Trigger render on any state change that affects the canvas visual
+  useEffect(() => {
+    renderCanvas();
+  }, [renderCanvas]);
 
   // Draw a single frame
   const drawFrame = useCallback((ctx: CanvasRenderingContext2D, frame: FrameData, isSelected: boolean) => {
@@ -372,7 +502,7 @@ export default function EnhancedCanvasEditor({
     ctx.fillRect(frame.x, frame.y, frame.width, frame.height);
     
     // Draw the text in the center of the frame coordinates
-    ctx.fillStyle = '#9ca3af';
+    ctx.fillStyle = frame.properties?.color || '#9ca3af';
     ctx.font = `${frame.properties?.fontSize || 16}px ${frame.properties?.fontFamily || 'Arial'}`;
     ctx.textAlign = 'center';
     ctx.fillText(
@@ -489,6 +619,10 @@ export default function EnhancedCanvasEditor({
     const centerY = frame.y + frame.height / 2;
     const rotationRad = (frame.rotation * Math.PI) / 180;
     
+    // Calculate handle sizes (RESIZE_HANDLE_BASE_SIZE is already in px)
+    const handleSize = RESIZE_HANDLE_BASE_SIZE;
+    const rotationDistance = ROTATION_HANDLE_BASE_DISTANCE;
+    
     // Calculate rotated handle positions
     const getRotatedPosition = (x: number, y: number) => {
       const dx = x - centerX;
@@ -520,13 +654,13 @@ export default function EnhancedCanvasEditor({
       ctx.setLineDash([]);
       
       ctx.beginPath();
-      ctx.arc(rotatedPos.x, rotatedPos.y, RESIZE_HANDLE_SIZE / 2, 0, 2 * Math.PI);
+      ctx.arc(rotatedPos.x, rotatedPos.y, handleSize / 2, 0, 2 * Math.PI);
       ctx.fill();
       ctx.stroke();
     });
 
     // Draw rotation handle (also rotated)
-    const rotationHandleY = frame.y - ROTATION_HANDLE_DISTANCE;
+    const rotationHandleY = frame.y - rotationDistance;
     const rotationHandlePos = getRotatedPosition(frame.x + frame.width / 2, rotationHandleY);
     
     ctx.fillStyle = '#ffffff';
@@ -534,7 +668,7 @@ export default function EnhancedCanvasEditor({
     ctx.lineWidth = 1;
     
     ctx.beginPath();
-    ctx.arc(rotationHandlePos.x, rotationHandlePos.y, RESIZE_HANDLE_SIZE / 2, 0, 2 * Math.PI);
+    ctx.arc(rotationHandlePos.x, rotationHandlePos.y, handleSize / 2, 0, 2 * Math.PI);
     ctx.fill();
     ctx.stroke();
 
@@ -546,22 +680,27 @@ export default function EnhancedCanvasEditor({
     ctx.moveTo(topCenterPos.x, topCenterPos.y);
     ctx.lineTo(rotationHandlePos.x, rotationHandlePos.y);
     ctx.stroke();
-  }, []);
+  }, [zoom]);
 
   // Mouse event handlers
-  const getMousePos = useCallback((e: React.MouseEvent) => {
+  const getMousePos = useCallback((e: React.MouseEvent | MouseEvent) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
     
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / zoom;
-    const y = (e.clientY - rect.top) / zoom;
+    // Maps screen pixels directly to internal 1200x800 coordinate system
+    // The current scale on screen is (displayScale * zoom)
+    const currentScale = displayScale * zoom;
+    const x = (e.clientX - rect.left) / currentScale - panOffset.x;
+    const y = (e.clientY - rect.top) / currentScale - panOffset.y;
     
     return { x, y };
-  }, [zoom]);
+  }, [displayScale, zoom, panOffset]);
 
   const getFrameAtPosition = useCallback((x: number, y: number): FrameData | null => {
     for (let i = frames.length - 1; i >= 0; i--) {
       const frame = frames[i];
+      // Don't select hidden or locked frames
+      if (frame.visible === false || frame.locked === true) continue;
       
       // Check if point is inside the rotated frame
       const centerX = frame.x + frame.width / 2;
@@ -610,29 +749,51 @@ export default function EnhancedCanvasEditor({
     ];
 
     // Check rotated handles
+    const hitSize = RESIZE_HANDLE_BASE_SIZE;
     for (const handle of handles) {
       const rotatedPos = getRotatedPosition(handle.x, handle.y);
-      const distance = Math.sqrt((x - rotatedPos.x) ** 2 + (y - rotatedPos.y) ** 2);
-      if (distance <= RESIZE_HANDLE_SIZE) {
+      const dist = Math.sqrt((x - rotatedPos.x) ** 2 + (y - rotatedPos.y) ** 2);
+      if (dist <= hitSize / 2 + 5) { // Adding a small buffer for easier hit testing
         return handle.handle;
       }
     }
 
     // Check rotation handle (also rotated)
-    const rotationHandleY = frame.y - ROTATION_HANDLE_DISTANCE;
+    const rotDist = ROTATION_HANDLE_BASE_DISTANCE;
+    const rotationHandleY = frame.y - rotDist;
     const rotationHandlePos = getRotatedPosition(frame.x + frame.width / 2, rotationHandleY);
-    const rotationDistance = Math.sqrt((x - rotationHandlePos.x) ** 2 + (y - rotationHandlePos.y) ** 2);
-    if (rotationDistance <= RESIZE_HANDLE_SIZE) {
+    const distToRotation = Math.sqrt((x - rotationHandlePos.x) ** 2 + (y - rotationHandlePos.y) ** 2);
+    if (distToRotation <= hitSize / 2 + 5) {
       return 'rotate';
     }
 
     return null;
-  }, []);
+  }, [zoom]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     if (readOnly) return;
     
     const { x, y } = getMousePos(e);
+
+    // Handle panning mode or middle mouse button
+    if (interactionMode === 'pan' || e.button === 1) {
+      setDragState({
+        isDragging: false,
+        isResizing: false,
+        isRotating: false,
+        isPanning: true,
+        isCreating: false,
+        startX: e.clientX,
+        startY: e.clientY,
+        startFrame: null,
+        startPan: { ...panOffset },
+        resizeHandle: null,
+        createType: null,
+        createShape: 'rectangle',
+      });
+      return;
+    }
+
     const frame = getFrameAtPosition(x, y);
     
     if (frame) {
@@ -643,10 +804,12 @@ export default function EnhancedCanvasEditor({
           isDragging: false,
           isResizing: false,
           isRotating: true,
+          isPanning: false,
           isCreating: false,
           startX: x,
           startY: y,
           startFrame: { ...frame },
+          startPan: null,
           resizeHandle: null,
           createType: null,
           createShape: 'rectangle',
@@ -656,10 +819,12 @@ export default function EnhancedCanvasEditor({
           isDragging: false,
           isResizing: true,
           isRotating: false,
+          isPanning: false,
           isCreating: false,
           startX: x,
           startY: y,
           startFrame: { ...frame },
+          startPan: null,
           resizeHandle: resizeHandle as any,
           createType: null,
           createShape: 'rectangle',
@@ -669,10 +834,12 @@ export default function EnhancedCanvasEditor({
           isDragging: true,
           isResizing: false,
           isRotating: false,
+          isPanning: false,
           isCreating: false,
           startX: x,
           startY: y,
           startFrame: { ...frame },
+          startPan: null,
           resizeHandle: null,
           createType: null,
           createShape: 'rectangle',
@@ -686,8 +853,13 @@ export default function EnhancedCanvasEditor({
   }, [getMousePos, getFrameAtPosition, getResizeHandle, onFrameSelect, readOnly]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!dragState.isDragging && !dragState.isResizing && !dragState.isRotating && !dragState.isCreating) {
+    if (!dragState.isDragging && !dragState.isResizing && !dragState.isRotating && !dragState.isCreating && !dragState.isPanning) {
       // Update cursor
+      if (interactionMode === 'pan') {
+        canvasRef.current!.style.cursor = dragState.isPanning ? 'grabbing' : 'grab';
+        return;
+      }
+
       const { x, y } = getMousePos(e);
       const frame = getFrameAtPosition(x, y);
       
@@ -703,6 +875,19 @@ export default function EnhancedCanvasEditor({
       } else {
         canvasRef.current!.style.cursor = 'default';
       }
+      return;
+    }
+
+    // Handle panning logic
+    if (dragState.isPanning) {
+      // Delta needs to be divided by displayScale * zoom because that's how much the physical screen px is magnified
+      const deltaX = (e.clientX - dragState.startX) / (displayScale * zoom);
+      const deltaY = (e.clientY - dragState.startY) / (displayScale * zoom);
+      
+      setPanOffset({
+        x: dragState.startPan!.x + deltaX,
+        y: dragState.startPan!.y + deltaY
+      });
       return;
     }
 
@@ -726,7 +911,7 @@ export default function EnhancedCanvasEditor({
         const useSnapping = !e.ctrlKey; // Ctrl key disables all snapping for free movement
         
         if (useSnapping) {
-          const snapped = snapPosition(newX, newY, f.id, useGrid);
+          const snapped = snapPosition(newX, newY, f.width, f.height, f.id, useGrid);
           newFrame.x = snapped.x;
           newFrame.y = snapped.y;
           setSnapLines(snapped.snapLines);
@@ -778,23 +963,62 @@ export default function EnhancedCanvasEditor({
     });
 
     onFramesChange?.(updatedFrames);
-  }, [dragState, getMousePos, frames, selectedFrameId, getFrameAtPosition, getResizeHandle, onFramesChange, canvasSize]);
+  }, [dragState, getMousePos, frames, selectedFrameId, getFrameAtPosition, getResizeHandle, onFramesChange, canvasSize, displayScale, zoom]);
 
   const handleMouseUp = useCallback(() => {
+    if (dragState.isDragging || dragState.isResizing || dragState.isRotating || dragState.isCreating || dragState.isPanning) {
+      if (!dragState.isPanning) {
+        onFramesChangeEnd?.(frames);
+      }
+    }
+
     setDragState({
       isDragging: false,
       isResizing: false,
       isRotating: false,
+      isPanning: false,
       isCreating: false,
       startX: 0,
       startY: 0,
       startFrame: null,
+      startPan: null,
       resizeHandle: null,
       createType: null,
       createShape: 'rectangle',
     });
     setSnapLines([]);
-  }, []);
+  }, [dragState, frames, onFramesChangeEnd]);
+
+  const updateFrame = useCallback((updates: Partial<FrameData>) => {
+    if (!selectedFrame || readOnly || !onFramesChange) return;
+    
+    const updatedFrames = frames.map(f => 
+      f.id === selectedFrame.id ? { ...f, ...updates } : f
+    );
+    onFramesChange(updatedFrames);
+  }, [selectedFrame, readOnly, onFramesChange, frames]);
+
+  const moveFrame = useCallback((direction: 'front' | 'back' | 'forward' | 'backward') => {
+    if (!selectedFrame || !onFramesChange) return;
+    
+    const index = frames.findIndex(f => f.id === selectedFrame.id);
+    if (index === -1) return;
+    
+    let newFrames = [...frames];
+    const item = newFrames.splice(index, 1)[0];
+    
+    if (direction === 'front') {
+      newFrames.push(item);
+    } else if (direction === 'back') {
+      newFrames.unshift(item);
+    } else if (direction === 'forward') {
+      newFrames.splice(Math.min(frames.length - 1, index + 1), 0, item);
+    } else if (direction === 'backward') {
+      newFrames.splice(Math.max(0, index - 1), 0, item);
+    }
+    
+    onFramesChange(newFrames);
+  }, [selectedFrame, onFramesChange, frames]);
 
   // Quick frame creation
   const createFrame = useCallback((type: 'image' | 'text', shape: 'rectangle' | 'circle' | 'rounded-rectangle' = 'rectangle') => {
@@ -803,11 +1027,14 @@ export default function EnhancedCanvasEditor({
     const frameWidth = type === 'image' ? 200 : 300;
     const frameHeight = type === 'image' ? 200 : 80;
     
-    // Calculate position to ensure frame stays within canvas bounds
-    const baseX = 100 + frames.length * 20;
-    const baseY = 100 + frames.length * 20;
-    const x = Math.max(0, Math.min(canvasSize.width - frameWidth, baseX));
-    const y = Math.max(0, Math.min(canvasSize.height - frameHeight, baseY));
+    // Calculate center position (1200x800 is the internal canvas size)
+    const centerX = 1200 / 2 - frameWidth / 2;
+    const centerY = 800 / 2 - frameHeight / 2;
+    
+    // Add a slight stagger for multiple elements
+    const staggerOffset = (frames.length % 10) * 20;
+    const x = centerX + staggerOffset;
+    const y = centerY + staggerOffset;
 
     const newFrame: FrameData = {
       id: `frame_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -833,7 +1060,7 @@ export default function EnhancedCanvasEditor({
     onFrameSelect(newFrame.id);
     
     toast.success(`${type === 'image' ? 'Image' : 'Text'} frame created!`);
-  }, [frames, onFramesChange, onFrameSelect, canvasSize]);
+  }, [frames, onFramesChange, onFrameSelect]);
 
   // Delete selected frame
   const deleteSelectedFrame = useCallback(() => {
@@ -915,16 +1142,44 @@ export default function EnhancedCanvasEditor({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedFrame, onFrameSelect, readOnly]);
+  }, [selectedFrame, onFrameSelect, readOnly, updateFrame, deleteSelectedFrame]);
 
-  const updateFrame = (updates: Partial<FrameData>) => {
-    if (!selectedFrame || readOnly || !onFramesChange) return;
+  // Spacebar panning effect
+  useEffect(() => {
+    if (readOnly) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && 
+          document.activeElement?.tagName !== 'INPUT' && 
+          document.activeElement?.tagName !== 'TEXTAREA' &&
+          interactionMode !== 'pan') {
+        setInteractionMode('pan');
+        e.preventDefault();
+      }
+      
+      // Shortcut keys
+      if (document.activeElement?.tagName !== 'INPUT' && document.activeElement?.tagName !== 'TEXTAREA') {
+        if (e.key.toLowerCase() === 'v') setInteractionMode('select');
+        if (e.key.toLowerCase() === 'h') setInteractionMode('pan');
+      }
+    };
     
-    const updatedFrames = frames.map(f => 
-      f.id === selectedFrame.id ? { ...f, ...updates } : f
-    );
-    onFramesChange(updatedFrames);
-  };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && interactionMode === 'pan') {
+        // Only switch back if we are using temporary spacebar panning
+        // We'll need another state to track if space is pressed
+        setInteractionMode('select');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, [interactionMode, readOnly]);
+
 
   // Render canvas when frames or selection changes
   useEffect(() => {
@@ -943,6 +1198,57 @@ export default function EnhancedCanvasEditor({
   const handleResetZoom = () => {
     setZoom(1);
   };
+
+  // Native Gesture Control (Pinch-to-zoom)
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    // Handle trackpad pinch (Ctrl + Wheel)
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault();
+        const zoomSpeed = 0.01;
+        const delta = -e.deltaY * zoomSpeed;
+        setZoom(prev => Math.max(0.1, Math.min(3, prev + delta)));
+      }
+    };
+
+    // Handle touch pinch
+    let initialDist = 0;
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        initialDist = Math.hypot(
+          e.touches[0].pageX - e.touches[1].pageX,
+          e.touches[0].pageY - e.touches[1].pageY
+        );
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 2) {
+        e.preventDefault(); // Stop page scaling
+        const dist = Math.hypot(
+          e.touches[0].pageX - e.touches[1].pageX,
+          e.touches[0].pageY - e.touches[1].pageY
+        );
+        
+        const delta = (dist - initialDist) * 0.01;
+        setZoom(prev => Math.max(0.1, Math.min(3, prev + delta)));
+        initialDist = dist;
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    container.addEventListener('touchstart', handleTouchStart);
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+    };
+  }, [setZoom]);
 
   // Export functionality
   const handleExport = () => {
@@ -999,185 +1305,120 @@ export default function EnhancedCanvasEditor({
   };
 
   return (
-    <Card className="relative overflow-hidden">
-      {/* Read-only indicator */}
-      {readOnly && (
-        <div className="absolute top-2 right-2 z-10 bg-yellow-100 border border-yellow-300 text-yellow-800 px-2 py-1 rounded text-xs font-medium">
-          Read Only
-        </div>
-      )}
-      
-      {/* Quick Actions Toolbar */}
-      {!readOnly && (
-        <div className="absolute top-2 left-2 z-10 flex gap-2">
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => createFrame('image', 'rectangle')}
-            className="bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
-          >
-            <ImageIcon className="h-4 w-4 mr-1" />
-            Add Image
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            onClick={() => createFrame('text', 'rectangle')}
-            className="bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
-          >
-            <Type className="h-4 w-4 mr-1" />
-            Add Text
-          </Button>
-          {selectedFrame && (
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={deleteSelectedFrame}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+    <div className="flex flex-col h-full bg-transparent overflow-hidden">
+      {/* Canvas Workspace */}
+      <div 
+        ref={containerRef}
+        className="flex-1 overflow-auto relative p-4 sm:p-8 flex items-center justify-center min-h-[400px] min-w-[300px]"
+      >
+        <div 
+          className="relative shadow-2xl bg-white border border-slate-200 flex-shrink-0 transition-transform duration-150 ease-out"
+          style={{ 
+            width: canvasSize.width * displayScale * zoom, 
+            height: canvasSize.height * displayScale * zoom,
+            minWidth: canvasSize.width * displayScale * zoom,
+            minHeight: canvasSize.height * displayScale * zoom
+          }}
+        >
+          <canvas
+            ref={canvasRef}
+            className={`absolute inset-0 block ${readOnly ? 'cursor-default' : (interactionMode === 'pan' ? 'cursor-grab active:cursor-grabbing' : 'cursor-crosshair')} touch-none`}
+            style={{ 
+              width: '100%', 
+              height: '100%'
+            }}
+            onMouseDown={readOnly ? undefined : handleMouseDown}
+            onMouseMove={readOnly ? undefined : handleMouseMove}
+            onMouseUp={readOnly ? undefined : handleMouseUp}
+            onMouseLeave={readOnly ? undefined : handleMouseUp}
+          />
+          
+          {isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[1px] z-50">
+              <div className="flex flex-col items-center gap-3">
+                <div className="animate-spin rounded-full h-10 w-10 border-4 border-amber-500 border-t-transparent"></div>
+                <p className="text-sm font-medium text-amber-900">Syncing Canvas...</p>
+              </div>
+            </div>
           )}
-        </div>
-      )}
-      
-      {/* Canvas Container */}
-      <div className="relative bg-gray-100">
-        <canvas
-          ref={canvasRef}
-          className="block cursor-default"
-          onMouseDown={readOnly ? undefined : handleMouseDown}
-          onMouseMove={readOnly ? undefined : handleMouseMove}
-          onMouseUp={readOnly ? undefined : handleMouseUp}
-          onMouseLeave={readOnly ? undefined : handleMouseUp}
-        />
-        
-        {/* Loading overlay */}
-        {isLoading && (
-          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-        )}
-      </div>
-
-      {/* Toolbar */}
-      <div className="flex items-center justify-between p-4 border-t">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleZoomOut}
-            disabled={zoom <= 0.1}
-          >
-            <ZoomOut className="h-4 w-4" />
-          </Button>
           
-          <span className="text-sm text-gray-600 min-w-[60px] text-center">
-            {Math.round(zoom * 100)}%
-          </span>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleZoomIn}
-            disabled={zoom >= 3}
-          >
-            <ZoomIn className="h-4 w-4" />
-          </Button>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleResetZoom}
-          >
-            <RotateCcw className="h-4 w-4" />
-          </Button>
-
-          <Separator orientation="vertical" className="h-6" />
-          
-          <Button
-            variant={showGrid ? "default" : "outline"}
-            size="sm"
-            onClick={() => setShowGrid(!showGrid)}
-          >
-            {showGrid ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-          </Button>
-          
-          <Button
-            variant={fineGrid ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFineGrid(!fineGrid)}
-            disabled={!showGrid}
-          >
-            <Grid3X3 className="h-4 w-4" />
-          </Button>
-
-          <Separator orientation="vertical" className="h-6" />
-          
-          {/* Rotation Controls */}
-          {selectedFrame && !readOnly && (
-            <div className="flex items-center gap-1">
-              <span className="text-xs text-gray-600 whitespace-nowrap">Rotation:</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRotationDown}
-                className="h-7 w-7 p-0"
-              >
-                ↓
-              </Button>
-              <input
-                type="number"
-                value={rotationInput}
-                onChange={(e) => handleRotationInputChange(e.target.value)}
-                onBlur={handleRotationInputBlur}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.currentTarget.blur();
-                  }
-                }}
-                className="w-16 h-7 text-center text-sm border border-gray-300 rounded px-1"
-                placeholder="0"
-                step="1"
-                min="-360"
-                max="360"
-              />
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRotationUp}
-                className="h-7 w-7 p-0"
-              >
-                ↑
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRotationReset}
-                className="h-7 px-2 text-xs"
-                title="Reset rotation"
-              >
-                0°
-              </Button>
+          {/* Contextual Mini-Toolbar (appears above selected frame) */}
+          {selectedFrame && !readOnly && !dragState.isDragging && !dragState.isResizing && !dragState.isRotating && (
+            <div 
+              className="absolute z-[100] flex items-center gap-1 bg-slate-900 shadow-2xl rounded-lg p-1.5 animate-in fade-in zoom-in duration-200 whitespace-nowrap ring-1 ring-white/10"
+              style={{
+                left: `${(selectedFrame.x + panOffset.x + selectedFrame.width / 2) * (zoom * displayScale)}px`,
+                top: `${(selectedFrame.y + panOffset.y) * (zoom * displayScale) - 55}px`,
+                transform: 'translateX(-50%)',
+                width: 'auto',
+                minWidth: 'max-content'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-1 flex-nowrap">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 text-white hover:bg-slate-800"
+                  onClick={() => {
+                    const id = `frame_${Date.now()}`;
+                    if (onFramesChange) {
+                      onFramesChange([...frames, { ...selectedFrame, id, x: selectedFrame.x + 20, y: selectedFrame.y + 20 }]);
+                      onFrameSelect(id);
+                    }
+                  }}
+                  title="Duplicate"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 text-white hover:bg-slate-800"
+                  onClick={() => updateFrame({ locked: !selectedFrame.locked })}
+                  title={selectedFrame.locked ? "Unlock" : "Lock"}
+                >
+                  {selectedFrame.locked ? <Lock className="h-3.5 w-3.5" /> : <Unlock className="h-3.5 w-3.5" />}
+                </Button>
+                
+                <Separator orientation="vertical" className="h-4 bg-slate-700 mx-0.5" />
+                
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 text-white hover:bg-slate-800"
+                  onClick={() => moveFrame('forward')}
+                  title="Bring Forward"
+                >
+                  <MoveUp className="h-3.5 w-3.5" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 text-white hover:bg-slate-800"
+                  onClick={() => moveFrame('backward')}
+                  title="Send Backward"
+                >
+                  <MoveDown className="h-3.5 w-3.5" />
+                </Button>
+ 
+                <Separator orientation="vertical" className="h-4 bg-slate-700 mx-0.5" />
+ 
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-7 w-7 text-white hover:bg-red-600"
+                  onClick={() => deleteSelectedFrame()}
+                  title="Delete"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+              </div>
             </div>
           )}
         </div>
-
-        <div className="flex items-center gap-2">
-          <div className="text-xs text-gray-500">
-            <span className="hidden sm:inline">Arrow keys: Move • Ctrl+R: Rotate • Ctrl+Shift+R: Rotate CCW • Ctrl+0: Reset • Delete: Remove • Alt: Precise • Ctrl: Free</span>
-          </div>
-          <FeatureGate feature="export_template">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-          </FeatureGate>
-        </div>
       </div>
-    </Card>
+    </div>
   );
-} 
+}
+ 

@@ -70,18 +70,15 @@ export function useAuth(): AuthContextType {
 
     // Prevent concurrent profile loading unless forced
     if (isLoadingProfileRef.current && !forceReload) {
-      console.log('⏳ Profile loading already in progress, skipping...');
       return;
     }
 
     isLoadingProfileRef.current = true;
 
     try {
-      console.log('📋 Loading profile for user:', user.email);
       const profile = await getCurrentProfile();
       
       if (isMountedRef.current) {
-        console.log('✅ Profile loaded successfully:', profile?.email);
         setState(prev => ({ ...prev, profile }));
       }
     } catch (error: any) {
@@ -120,8 +117,6 @@ export function useAuth(): AuthContextType {
         
         if (!mounted) return;
         
-        console.log('🔐 Initial session check:', session?.user?.email || 'No user');
-        
         setState(prev => ({
           ...prev,
           session,
@@ -148,11 +143,6 @@ export function useAuth(): AuthContextType {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return;
-        
-        // Only log important events to reduce console spam
-        if (['SIGNED_IN', 'SIGNED_OUT', 'TOKEN_REFRESHED'].includes(event)) {
-          console.log('🔄 Auth state changed:', event, session?.user?.email || 'No user');
-        }
         
         // Check if this is a duplicate session event
         const isDuplicateSession = lastSessionRef.current?.access_token === session?.access_token &&

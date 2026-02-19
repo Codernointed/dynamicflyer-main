@@ -38,55 +38,39 @@ export default function TemplateGrid({
     visible: {
       opacity: 1,
       transition: {
-        staggerChildren: 0.1
+        staggerChildren: 0.05
       }
     }
   };
 
   const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0, y: 10 },
     visible: {
       opacity: 1,
       y: 0,
       transition: {
-        duration: 0.3
+        type: "spring",
+        damping: 25,
+        stiffness: 300
       }
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
-              Your Templates
-            </span>
-          </h2>
-          <p className="text-gray-600">
-            Create and manage your design templates
-          </p>
-        </div>
-        <Button onClick={onCreateNew} size="lg" className="bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white border-0">
-          <Plus className="mr-2 h-5 w-5" />
-          Create New Template
-        </Button>
-      </div>
-
-      {/* Templates Grid */}
+    <div className="space-y-8">
+      {/* Templates Grid - High Density */}
       {loading ? (
-        <div className={`grid gap-6 ${
+        <div className={`grid gap-4 sm:gap-6 ${
           viewMode === 'list' 
             ? 'grid-cols-1' 
-            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+            : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
         }`}>
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="animate-pulse">
-              <div className="aspect-[3/4] rounded-lg bg-gray-200" />
-              <div className="mt-3 space-y-2">
-                <div className="h-4 rounded bg-gray-200" />
-                <div className="h-3 w-3/4 rounded bg-gray-200" />
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="animate-pulse space-y-4">
+              <div className="aspect-[4/5] rounded-2xl bg-slate-100" />
+              <div className="space-y-2 px-1">
+                <div className="h-4 w-2/3 rounded bg-slate-100" />
+                <div className="h-3 w-1/2 rounded bg-slate-100" />
               </div>
             </div>
           ))}
@@ -96,14 +80,15 @@ export default function TemplateGrid({
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className={`grid gap-6 ${
+          layout
+          className={`grid gap-4 sm:gap-6 ${
             viewMode === 'list' 
               ? 'grid-cols-1' 
-              : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+              : 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
           }`}
         >
           {templates.map((template) => (
-            <motion.div key={template.id} variants={itemVariants}>
+            <motion.div key={template.id} variants={itemVariants} layout>
               <TemplateCard 
                 template={template}
                 onEdit={onEditTemplate}
@@ -121,30 +106,37 @@ export default function TemplateGrid({
   );
 }
 
-// Empty state component
+// Empty state component - Premium Refinement
 interface EmptyStateProps {
   onCreateNew: () => void;
 }
 
 function EmptyState({ onCreateNew }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="rounded-full bg-gray-100 p-6 mb-4">
-        <Plus className="h-12 w-12 text-gray-400" />
+    <div className="flex flex-col items-center justify-center py-24 text-center bg-white border border-slate-100 rounded-[2rem] shadow-sm">
+      <div className="relative mb-8">
+        <div className="absolute inset-0 bg-amber-100 blur-3xl rounded-full opacity-50" />
+        <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-50 to-amber-100 shadow-inner">
+          <Plus className="h-10 w-10 text-amber-600" />
+        </div>
       </div>
       
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">
-        No templates yet
+      <h3 className="text-xl font-bold text-slate-900 mb-2">
+        Start Your First Design
       </h3>
       
-      <p className="text-gray-600 mb-6 max-w-sm">
-        Create your first template to get started with personalized designs.
+      <p className="text-slate-500 mb-8 max-w-sm leading-relaxed">
+        Choose from our professionally crafted layouts or start from scratch to create something unique.
       </p>
 
-        <Button onClick={onCreateNew}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Template
-        </Button>
+      <Button 
+        onClick={onCreateNew}
+        className="h-12 px-8 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl shadow-xl shadow-slate-200"
+      >
+        <Plus className="mr-2 h-5 w-5" />
+        Create Template
+      </Button>
     </div>
   );
-} 
+}
+ 

@@ -94,8 +94,8 @@ export const SUBSCRIPTION_FEATURES: Record<string, FeatureLimits> = {
     prioritySupport: false,
   },
   student_pro: {
-    templates: 20,
-    exports: 100,
+    templates: 30,
+    exports: 150,
     storage: '1GB',
     customFonts: true,
     pdfExport: false,
@@ -107,7 +107,7 @@ export const SUBSCRIPTION_FEATURES: Record<string, FeatureLimits> = {
   },
   creator_pro: {
     templates: -1, // Unlimited
-    exports: 500,
+    exports: 600,
     storage: '5GB',
     customFonts: true,
     pdfExport: true,
@@ -119,7 +119,7 @@ export const SUBSCRIPTION_FEATURES: Record<string, FeatureLimits> = {
   },
   department: {
     templates: -1,
-    exports: 1000,
+    exports: 1200,
     storage: '10GB',
     customFonts: true,
     pdfExport: true,
@@ -131,7 +131,7 @@ export const SUBSCRIPTION_FEATURES: Record<string, FeatureLimits> = {
   },
   church: {
     templates: -1,
-    exports: 2000,
+    exports: 2500,
     storage: '20GB',
     customFonts: true,
     pdfExport: true,
@@ -143,7 +143,7 @@ export const SUBSCRIPTION_FEATURES: Record<string, FeatureLimits> = {
   },
   faculty: {
     templates: -1,
-    exports: 5000,
+    exports: 6000,
     storage: '50GB',
     customFonts: true,
     pdfExport: true,

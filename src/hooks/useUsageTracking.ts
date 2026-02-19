@@ -257,27 +257,32 @@ export function useUsageTracking() {
     const stats = await getUsageStats();
     if (!stats) return null;
 
+    // Get actual limits from feature gating system
+    const tier = user?.user_metadata?.subscription_tier || 'free';
+    const { getFeatureLimits } = await import('@/lib/featureGating');
+    const limits = getFeatureLimits(tier);
+
     return {
       templates: {
         used: stats.templates_created,
-        limit: 3, // Default free tier limit
-        remaining: Math.max(0, 3 - stats.templates_created),
-        percentage: Math.min(100, (stats.templates_created / 3) * 100),
+        limit: limits.templates,
+        remaining: limits.templates === -1 ? -1 : Math.max(0, limits.templates - stats.templates_created),
+        percentage: limits.templates === -1 ? 0 : Math.min(100, (stats.templates_created / limits.templates) * 100),
       },
       exports: {
         used: stats.monthly_exports,
-        limit: 10, // Default free tier limit
-        remaining: Math.max(0, 10 - stats.monthly_exports),
-        percentage: Math.min(100, (stats.monthly_exports / 10) * 100),
+        limit: limits.exports,
+        remaining: limits.exports === -1 ? -1 : Math.max(0, limits.exports - stats.monthly_exports),
+        percentage: limits.exports === -1 ? 0 : Math.min(100, (stats.monthly_exports / limits.exports) * 100),
       },
       fonts: {
         used: stats.fonts_uploaded,
-        limit: 0, // Free tier can't upload fonts
-        remaining: 0,
-        percentage: 0,
+        limit: limits.customFonts ? -1 : 0,
+        remaining: limits.customFonts ? -1 : 0,
+        percentage: limits.customFonts ? 0 : 100,
       },
     };
-  }, [getUsageStats]);
+  }, [getUsageStats, user]);
 
   /**
    * Show usage limit warning

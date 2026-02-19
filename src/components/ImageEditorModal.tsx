@@ -62,6 +62,7 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
+  const [viewScale, setViewScale] = useState(1);
   const [loading, setLoading] = useState(false);
 
   // Load image when file changes
@@ -103,6 +104,22 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     });
   }, [frame, previousTransformData]);
 
+  // Calculate view scale to fit frame on canvas
+  useEffect(() => {
+    if (!frame) return;
+    
+    const padding = 20; // Reduced padding for maximizing space
+    const availableWidth = canvasSize.width - padding * 2;
+    const availableHeight = canvasSize.height - padding * 2;
+    
+    const scaleX = availableWidth / frame.width;
+    const scaleY = availableHeight / frame.height;
+    
+    // Auto-fit frame to the available preview space
+    const newViewScale = Math.min(scaleX, scaleY);
+    setViewScale(newViewScale);
+  }, [frame, canvasSize]);
+
   // Draw everything
   const drawCanvas = useCallback(() => {
     if (!canvasRef.current || !image) return;
@@ -119,37 +136,37 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Calculate frame position (center of canvas)
-    const frameX = (canvas.width - frame.width) / 2;
-    const frameY = (canvas.height - frame.height) / 2;
+    const frameX = (canvas.width - frame.width * viewScale) / 2;
+    const frameY = (canvas.height - frame.height * viewScale) / 2;
 
-    // Draw white overlay outside the frame area
+    // Draw background overlay outside the frame area
     ctx.globalCompositeOperation = 'source-over';
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Clear the frame area (make it transparent to show image)
+    // Clear the frame area
     ctx.globalCompositeOperation = 'destination-out';
     
-    // Apply frame rotation for clearing
     ctx.save();
-    const clearFrameCenterX = frameX + frame.width / 2;
-    const clearFrameCenterY = frameY + frame.height / 2;
+    const clearFrameCenterX = frameX + (frame.width * viewScale) / 2;
+    const clearFrameCenterY = frameY + (frame.height * viewScale) / 2;
     ctx.translate(clearFrameCenterX, clearFrameCenterY);
     ctx.rotate((frame.rotation * Math.PI) / 180);
-    ctx.translate(-clearFrameCenterX, -clearFrameCenterY);
+    ctx.scale(viewScale, viewScale);
+    ctx.translate(-frame.width / 2, -frame.height / 2);
     
     switch (frame.shape) {
       case 'circle': {
         const radius = Math.min(frame.width, frame.height) / 2;
         ctx.beginPath();
-        ctx.arc(clearFrameCenterX, clearFrameCenterY, radius, 0, 2 * Math.PI);
+        ctx.arc(frame.width / 2, frame.height / 2, radius, 0, 2 * Math.PI);
         ctx.fill();
         break;
       }
       case 'rounded-rectangle': {
         const radius = frame.cornerRadius || 20;
         ctx.beginPath();
-        ctx.roundRect(frameX, frameY, frame.width, frame.height, radius);
+        ctx.roundRect(0, 0, frame.width, frame.height, radius);
         ctx.fill();
         break;
       }
@@ -160,8 +177,8 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
         ctx.beginPath();
         for (let i = 0; i < sides; i++) {
           const angle = (i * 2 * Math.PI) / sides - Math.PI / 2;
-          const x = clearFrameCenterX + radius * Math.cos(angle);
-          const y = clearFrameCenterY + radius * Math.sin(angle);
+          const x = frame.width / 2 + radius * Math.cos(angle);
+          const y = frame.height / 2 + radius * Math.sin(angle);
           if (i === 0) {
             ctx.moveTo(x, y);
           } else {
@@ -173,7 +190,7 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
         break;
       }
       default: // rectangle
-        ctx.fillRect(frameX, frameY, frame.width, frame.height);
+        ctx.fillRect(0, 0, frame.width, frame.height);
     }
     
     ctx.restore();
@@ -183,13 +200,13 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     ctx.save();
 
     // Move to frame center
-    const frameCenterX = frameX + frame.width / 2;
-    const frameCenterY = frameY + frame.height / 2;
+    const frameCenterX = frameX + (frame.width * viewScale) / 2;
+    const frameCenterY = frameY + (frame.height * viewScale) / 2;
 
     // Apply transformations
     ctx.translate(frameCenterX, frameCenterY);
     ctx.rotate((transform.rotation * Math.PI) / 180);
-    ctx.scale(transform.scale, transform.scale);
+    ctx.scale(transform.scale * viewScale, transform.scale * viewScale);
     ctx.translate(transform.x, transform.y);
 
     // Draw image
@@ -207,26 +224,23 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     // Draw frame boundary on top
     ctx.strokeStyle = '#3b82f6';
     ctx.lineWidth = 3;
-    ctx.setLineDash([]);
     
-    // Apply frame rotation for boundary
     ctx.save();
-    const boundaryFrameCenterX = frameX + frame.width / 2;
-    const boundaryFrameCenterY = frameY + frame.height / 2;
-    ctx.translate(boundaryFrameCenterX, boundaryFrameCenterY);
+    ctx.translate(frameCenterX, frameCenterY);
     ctx.rotate((frame.rotation * Math.PI) / 180);
-    ctx.translate(-boundaryFrameCenterX, -boundaryFrameCenterY);
+    ctx.scale(viewScale, viewScale);
+    ctx.translate(-frame.width / 2, -frame.height / 2);
     
     ctx.beginPath();
     switch (frame.shape) {
       case 'circle': {
         const radius = Math.min(frame.width, frame.height) / 2;
-        ctx.arc(boundaryFrameCenterX, boundaryFrameCenterY, radius, 0, 2 * Math.PI);
+        ctx.arc(frame.width / 2, frame.height / 2, radius, 0, 2 * Math.PI);
         break;
       }
       case 'rounded-rectangle': {
         const radius = frame.cornerRadius || 20;
-        ctx.roundRect(frameX, frameY, frame.width, frame.height, radius);
+        ctx.roundRect(0, 0, frame.width, frame.height, radius);
         break;
       }
       case 'polygon': {
@@ -235,8 +249,8 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
         
         for (let i = 0; i < sides; i++) {
           const angle = (i * 2 * Math.PI) / sides - Math.PI / 2;
-          const x = boundaryFrameCenterX + radius * Math.cos(angle);
-          const y = boundaryFrameCenterY + radius * Math.sin(angle);
+          const x = frame.width / 2 + radius * Math.cos(angle);
+          const y = frame.height / 2 + radius * Math.sin(angle);
           if (i === 0) {
             ctx.moveTo(x, y);
           } else {
@@ -247,11 +261,11 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
         break;
       }
       default: // rectangle
-        ctx.rect(frameX, frameY, frame.width, frame.height);
+        ctx.rect(0, 0, frame.width, frame.height);
     }
     ctx.stroke();
     ctx.restore();
-  }, [image, transform, frame]);
+  }, [image, transform, frame, viewScale]);
 
   // Redraw when dependencies change
   useEffect(() => {
@@ -284,8 +298,8 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
 
     setTransform(prev => ({
       ...prev,
-      x: prev.x + deltaX / transform.scale,
-      y: prev.y + deltaY / transform.scale
+      x: prev.x + deltaX / (transform.scale * viewScale),
+      y: prev.y + deltaY / (transform.scale * viewScale)
     }));
 
     setDragStart({ x, y });
@@ -362,8 +376,8 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
 
       setTransform(prev => ({
         ...prev,
-        x: prev.x + deltaX / transform.scale,
-        y: prev.y + deltaY / transform.scale
+        x: prev.x + deltaX / (transform.scale * viewScale),
+        y: prev.y + deltaY / (transform.scale * viewScale)
       }));
 
       setDragStart({ x, y });
@@ -395,6 +409,14 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
   const handleReset = () => {
     if (image) {
       initializeTransform(image);
+      
+      // Also reset viewScale
+      const padding = 20;
+      const availableWidth = canvasSize.width - padding * 2;
+      const availableHeight = canvasSize.height - padding * 2;
+      const scaleX = availableWidth / frame.width;
+      const scaleY = availableHeight / frame.height;
+      setViewScale(Math.min(scaleX, scaleY));
     }
   };
 
@@ -496,28 +518,24 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-[98vw] w-[1200px] h-[95vh] flex flex-col p-0">
-        <DialogHeader className="p-4 pb-2">
+      <DialogContent className="max-w-[98vw] w-[1200px] h-[95vh] flex flex-col p-0 overflow-hidden">
+        <DialogHeader className="p-4 pb-2 border-b">
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl">Edit Image</DialogTitle>
-            <Button variant="ghost" size="sm" onClick={onClose}>
+            <DialogTitle className="text-xl font-bold">Edit Image</DialogTitle>
+            <Button variant="ghost" size="sm" onClick={onClose} className="rounded-full h-8 w-8 p-0">
               <X className="h-4 w-4" />
             </Button>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Drag to move, scroll wheel to zoom, pinch to zoom on mobile. Use controls below for precise adjustments. 
-            <span className="text-blue-600 font-medium"> Clear area</span> shows what will appear in your template.
-          </p>
         </DialogHeader>
         
-        <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-          {/* Canvas Container */}
-          <div className="flex-1 relative bg-gray-50 flex items-center justify-center p-4 min-h-0">
+        <div className="flex-1 overflow-y-auto bg-gray-50 flex flex-col p-0">
+          {/* Preview Area (Expanded Cyan) */}
+          <div className="relative flex items-center justify-center p-2 min-h-[300px] sm:min-h-[400px]">
             <canvas
               ref={canvasRef}
               width={canvasSize.width}
               height={canvasSize.height}
-              className="border border-gray-200 rounded-lg shadow-sm cursor-move max-w-full max-h-full object-contain"
+              className="border border-gray-200 rounded-lg shadow-sm cursor-move max-w-full h-auto object-contain bg-white"
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
@@ -529,23 +547,29 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
             />
           </div>
 
-          {/* Controls */}
-          <div className="w-80 lg:w-96 p-4 border-l bg-gray-50 overflow-y-auto flex-shrink-0">
-            <div className="space-y-4">
+          {/* Controls Area (Green shifted below) */}
+          <div className="p-4 sm:p-6 bg-white border-t space-y-6">
+            <div className="max-w-2xl mx-auto space-y-6">
               <div>
-                <h3 className="text-lg font-semibold mb-3">Image Controls</h3>
+                <h3 className="text-lg font-semibold flex items-center gap-2">
+                  <Move className="h-4 w-4 text-blue-500" />
+                  Image Controls
+                </h3>
               </div>
               
               {/* Zoom Control */}
-              <div>
-                <label className="flex items-center justify-between text-sm font-medium mb-2">
+              <div className="space-y-3">
+                <label className="flex items-center justify-between text-sm font-medium">
                   <span>Zoom</span>
-                  <span className="text-muted-foreground">{Math.round(transform.scale * 100)}%</span>
+                  <span className="text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded text-xs">
+                    {Math.round(transform.scale * 100)}%
+                  </span>
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
                     onClick={() => setTransform(prev => ({ ...prev, scale: Math.max(0.1, prev.scale - 0.1) }))}
                   >
                     <ZoomOut className="h-4 w-4" />
@@ -560,54 +584,61 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
                   />
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
                     onClick={() => setTransform(prev => ({ ...prev, scale: Math.min(3, prev.scale + 0.1) }))}
                   >
                     <ZoomIn className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2 pt-1">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
+                    className="h-7 px-2 text-muted-foreground hover:text-foreground"
                     onClick={() => setTransform(prev => ({ ...prev, scale: Math.max(0.1, prev.scale - 0.01) }))}
                   >
-                    ↑
+                    -1%
                   </Button>
-                  <input
-                    type="number"
-                    value={Math.round(transform.scale * 100)}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value) / 100;
-                      if (!isNaN(value)) {
-                        setTransform(prev => ({ ...prev, scale: Math.max(0.1, Math.min(3, value)) }));
-                      }
-                    }}
-                    className="w-16 px-2 py-1 text-center border rounded text-sm"
-                    min="10"
-                    max="300"
-                    step="1"
-                  />
+                  <div className="flex-1 flex justify-center">
+                    <input
+                      type="number"
+                      value={Math.round(transform.scale * 100)}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value) / 100;
+                        if (!isNaN(value)) {
+                          setTransform(prev => ({ ...prev, scale: Math.max(0.1, Math.min(3, value)) }));
+                        }
+                      }}
+                      className="w-16 h-8 text-center border rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      min="10"
+                      max="300"
+                    />
+                  </div>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
+                    className="h-7 px-2 text-muted-foreground hover:text-foreground"
                     onClick={() => setTransform(prev => ({ ...prev, scale: Math.min(3, prev.scale + 0.01) }))}
                   >
-                    ↓
+                    +1%
                   </Button>
                 </div>
               </div>
 
               {/* Rotation Control */}
-              <div>
-                <label className="flex items-center justify-between text-sm font-medium mb-2">
+              <div className="space-y-3">
+                <label className="flex items-center justify-between text-sm font-medium">
                   <span>Rotation</span>
-                  <span className="text-muted-foreground">{transform.rotation}°</span>
+                  <span className="text-muted-foreground font-mono bg-muted px-2 py-0.5 rounded text-xs">
+                    {transform.rotation}°
+                  </span>
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-4">
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
                     onClick={handleRotateLeft}
                   >
                     <RotateCcw className="h-4 w-4" />
@@ -622,40 +653,44 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
                   />
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
                     onClick={handleRotateRight}
                   >
                     <RotateCw className="h-4 w-4" />
                   </Button>
                 </div>
-                <div className="flex items-center gap-2 mt-2">
+                <div className="flex items-center gap-2 pt-1">
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
+                    className="h-7 px-2 text-muted-foreground hover:text-foreground"
                     onClick={() => setTransform(prev => ({ ...prev, rotation: Math.max(-180, prev.rotation - 1) }))}
                   >
-                    ↑
+                    -1°
                   </Button>
-                  <input
-                    type="number"
-                    value={Math.round(transform.rotation)}
-                    onChange={(e) => {
-                      const value = parseFloat(e.target.value);
-                      if (!isNaN(value)) {
-                        setTransform(prev => ({ ...prev, rotation: Math.max(-180, Math.min(180, value)) }));
-                      }
-                    }}
-                    className="w-16 px-2 py-1 text-center border rounded text-sm"
-                    min="-180"
-                    max="180"
-                    step="1"
-                  />
+                  <div className="flex-1 flex justify-center">
+                    <input
+                      type="number"
+                      value={Math.round(transform.rotation)}
+                      onChange={(e) => {
+                        const value = parseFloat(e.target.value);
+                        if (!isNaN(value)) {
+                          setTransform(prev => ({ ...prev, rotation: Math.max(-180, Math.min(180, value)) }));
+                        }
+                      }}
+                      className="w-16 h-8 text-center border rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      min="-180"
+                      max="180"
+                    />
+                  </div>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
+                    className="h-7 px-2 text-muted-foreground hover:text-foreground"
                     onClick={() => setTransform(prev => ({ ...prev, rotation: Math.min(180, prev.rotation + 1) }))}
                   >
-                    ↓
+                    +1°
                   </Button>
                 </div>
               </div>
@@ -663,36 +698,39 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
               <Separator />
 
               {/* Action Buttons */}
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between pt-2">
                 <Button
                   variant="outline"
                   onClick={handleReset}
+                  className="gap-2 justify-center"
                 >
-                  <Move className="h-4 w-4 mr-2" />
-                  Reset
+                  <RotateCcw className="h-4 w-4" />
+                  Reset View
                 </Button>
                 
-                <div className="flex gap-2">
+                <div className="flex gap-2 sm:gap-3">
                   <Button
                     variant="outline"
                     onClick={onClose}
+                    className="flex-1 sm:flex-none justify-center"
                   >
                     Cancel
                   </Button>
                   <Button
                     onClick={handleApply}
                     disabled={loading}
+                    className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px] flex-1 sm:flex-none justify-center"
                   >
                     {loading ? (
-                      <>
-                        <div className="w-4 h-4 mr-2 rounded-full border-2 border-background/20 border-t-background animate-spin"></div>
-                        Applying...
-                      </>
+                      <div className="flex items-center gap-2">
+                        <div className="w-4 h-4 rounded-full border-2 border-white/20 border-t-white animate-spin"></div>
+                        <span>Applying...</span>
+                      </div>
                     ) : (
-                      <>
-                        <Check className="h-4 w-4 mr-2" />
-                        Apply
-                      </>
+                      <div className="flex items-center gap-2">
+                        <Check className="h-4 w-4" />
+                        <span>Save Changes</span>
+                      </div>
                     )}
                   </Button>
                 </div>
