@@ -15,3 +15,5 @@ ALTER COLUMN subscription_tier SET DEFAULT 'free';
 UPDATE public.profiles
 SET subscription_tier = 'free'
 WHERE subscription_tier NOT IN ('free', 'student_pro', 'creator_pro', 'department', 'church', 'faculty', 'enterprise');
+
+

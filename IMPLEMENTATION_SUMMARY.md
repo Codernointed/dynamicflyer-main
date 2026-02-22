@@ -176,6 +176,7 @@ await trackTemplateCreation('template-id');
 - **Overview**: Current plan and usage summary
 - **Billing**: Payment history and subscription details
 - **Usage**: Detailed usage analytics and trends
+- **Billing**: Verification 
 
 ## 🔒 Security Features
 

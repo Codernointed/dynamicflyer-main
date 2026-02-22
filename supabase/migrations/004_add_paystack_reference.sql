@@ -13,3 +13,5 @@ ADD COLUMN IF NOT EXISTS paystack_reference TEXT;
 -- Update the payments table to ensure paystack_reference is unique
 ALTER TABLE payments
 ADD CONSTRAINT IF NOT EXISTS unique_paystack_reference UNIQUE (paystack_reference);
+
+
