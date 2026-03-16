@@ -759,7 +759,7 @@ export default function PublicGenerator() {
                         variant="ghost" 
                         onClick={handleExportPDF} 
                         disabled={generating}
-                        className="w-full h-12 text-white/60 hover:text-white"
+                        className="w-full h-12 text-white/60 hover:text-white hover:bg-white/10"
                     >
                         Export as PDF
                     </Button>

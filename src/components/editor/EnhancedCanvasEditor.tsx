@@ -1359,7 +1359,7 @@ export default function EnhancedCanvasEditor({
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="h-7 w-7 text-white hover:bg-slate-800"
+                  className="h-7 w-7 text-white hover:bg-slate-800 hover:text-white"
                   onClick={() => {
                     const id = `frame_${Date.now()}`;
                     if (onFramesChange) {
@@ -1374,7 +1374,7 @@ export default function EnhancedCanvasEditor({
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="h-7 w-7 text-white hover:bg-slate-800"
+                  className="h-7 w-7 text-white hover:bg-slate-800 hover:text-white"
                   onClick={() => updateFrame({ locked: !selectedFrame.locked })}
                   title={selectedFrame.locked ? "Unlock" : "Lock"}
                 >
@@ -1386,7 +1386,7 @@ export default function EnhancedCanvasEditor({
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="h-7 w-7 text-white hover:bg-slate-800"
+                  className="h-7 w-7 text-white hover:bg-slate-800 hover:text-white"
                   onClick={() => moveFrame('forward')}
                   title="Bring Forward"
                 >
@@ -1395,7 +1395,7 @@ export default function EnhancedCanvasEditor({
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="h-7 w-7 text-white hover:bg-slate-800"
+                  className="h-7 w-7 text-white hover:bg-slate-800 hover:text-white"
                   onClick={() => moveFrame('backward')}
                   title="Send Backward"
                 >
@@ -1407,7 +1407,7 @@ export default function EnhancedCanvasEditor({
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="h-7 w-7 text-white hover:bg-red-600"
+                  className="h-7 w-7 text-white hover:bg-red-600 hover:text-white"
                   onClick={() => deleteSelectedFrame()}
                   title="Delete"
                 >

@@ -63,6 +63,7 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [viewScale, setViewScale] = useState(1);
+  const [minScale, setMinScale] = useState(0.1);
   const [loading, setLoading] = useState(false);
 
   // Load image when file changes
@@ -95,6 +96,13 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     const scaleX = frame.width / img.width;
     const scaleY = frame.height / img.height;
     const scale = Math.max(scaleX, scaleY); // Cover the frame completely
+    
+    // Calculate a safe minimum scale (at least small enough to fit diagonally inside the frame's shortest dimension)
+    const imgDiagonal = Math.sqrt(img.width * img.width + img.height * img.height);
+    const frameMinDim = Math.min(frame.width, frame.height);
+    const calculatedMinScale = (frameMinDim / imgDiagonal) * 0.8; // 0.8 is a safety buffer
+    // Don't let minScale be larger than 0.1 (previous hardcoded min)
+    setMinScale(Math.min(0.1, calculatedMinScale));
 
     setTransform({
       scale,
@@ -112,13 +120,22 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     const availableWidth = canvasSize.width - padding * 2;
     const availableHeight = canvasSize.height - padding * 2;
     
-    const scaleX = availableWidth / frame.width;
-    const scaleY = availableHeight / frame.height;
+    // Calculate the bounding box of the rotated frame
+    const angleRad = (frame.rotation * Math.PI) / 180;
+    const cosAngle = Math.abs(Math.cos(angleRad));
+    const sinAngle = Math.abs(Math.sin(angleRad));
     
-    // Auto-fit frame to the available preview space
+    const boundingWidth = frame.width * cosAngle + frame.height * sinAngle;
+    const boundingHeight = frame.height * cosAngle + frame.width * sinAngle;
+    
+    const scaleX = availableWidth / boundingWidth;
+    const scaleY = availableHeight / boundingHeight;
+    
+    // Auto-fit rotated frame bounds to the available preview space
     const newViewScale = Math.min(scaleX, scaleY);
     setViewScale(newViewScale);
   }, [frame, canvasSize]);
+
 
   // Draw everything
   const drawCanvas = useCallback(() => {
@@ -314,7 +331,7 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
     e.preventDefault();
     
     const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    const newScale = Math.max(0.1, Math.min(5, transform.scale * zoomFactor));
+    const newScale = Math.max(minScale, Math.min(5, transform.scale * zoomFactor));
     
     setTransform(prev => ({
       ...prev,
@@ -356,7 +373,7 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
       const currentDistance = getDistance(e.touches);
       if (touchStart.distance > 0) {
         const scaleFactor = currentDistance / touchStart.distance;
-        const newScale = Math.max(0.1, Math.min(5, transform.scale * scaleFactor));
+        const newScale = Math.max(minScale, Math.min(5, transform.scale * scaleFactor));
         
         setTransform(prev => ({
           ...prev,
@@ -570,14 +587,14 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
                     variant="outline"
                     size="icon"
                     className="h-9 w-9 shrink-0"
-                    onClick={() => setTransform(prev => ({ ...prev, scale: Math.max(0.1, prev.scale - 0.1) }))}
+                    onClick={() => setTransform(prev => ({ ...prev, scale: Math.max(minScale, prev.scale - 0.1) }))}
                   >
                     <ZoomOut className="h-4 w-4" />
                   </Button>
                   <Slider
                     value={[transform.scale]}
                     onValueChange={handleZoomChange}
-                    min={0.1}
+                    min={minScale}
                     max={3}
                     step={0.1}
                     className="flex-1"
@@ -596,7 +613,7 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
                     variant="ghost"
                     size="sm"
                     className="h-7 px-2 text-muted-foreground hover:text-foreground"
-                    onClick={() => setTransform(prev => ({ ...prev, scale: Math.max(0.1, prev.scale - 0.01) }))}
+                    onClick={() => setTransform(prev => ({ ...prev, scale: Math.max(minScale, prev.scale - 0.01) }))}
                   >
                     -1%
                   </Button>
@@ -607,11 +624,11 @@ const ImageEditorModal: React.FC<ImageEditorModalProps> = ({
                       onChange={(e) => {
                         const value = parseFloat(e.target.value) / 100;
                         if (!isNaN(value)) {
-                          setTransform(prev => ({ ...prev, scale: Math.max(0.1, Math.min(3, value)) }));
+                          setTransform(prev => ({ ...prev, scale: Math.max(minScale, Math.min(3, value)) }));
                         }
                       }}
                       className="w-16 h-8 text-center border rounded-md text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                      min="10"
+                      min={Math.round(minScale * 100)}
                       max="300"
                     />
                   </div>
