@@ -13,9 +13,18 @@ import { toast } from 'sonner';
 interface QRCodeGeneratorProps {
   url: string;
   templateName?: string;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  children?: React.ReactNode;
 }
 
-export default function QRCodeGenerator({ url, templateName }: QRCodeGeneratorProps) {
+export default function QRCodeGenerator({ 
+  url, 
+  templateName, 
+  open, 
+  onOpenChange,
+  children 
+}: QRCodeGeneratorProps) {
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [isGenerating, setIsGenerating] = useState(false);
 
@@ -37,7 +46,7 @@ export default function QRCodeGenerator({ url, templateName }: QRCodeGeneratorPr
       setQrCodeDataUrl(dataUrl);
     } catch (error) {
       console.error('Error generating QR code:', error);
-      toast.error('Failed to generate QR code');
+      // toast.error('Failed to generate QR code');
     } finally {
       setIsGenerating(false);
     }
@@ -55,19 +64,18 @@ export default function QRCodeGenerator({ url, templateName }: QRCodeGeneratorPr
   };
 
   useEffect(() => {
-    if (url) {
+    if (url && (open === undefined || open === true)) {
       generateQRCode();
     }
-  }, [url]);
+  }, [url, open]);
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button variant="outline" size="sm">
-          <QrCode className="mr-2 h-4 w-4" />
-          QR Code
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      {children && (
+        <DialogTrigger asChild>
+          {children}
+        </DialogTrigger>
+      )}
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>QR Code for Sharing</DialogTitle>

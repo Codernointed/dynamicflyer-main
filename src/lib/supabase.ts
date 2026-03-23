@@ -449,16 +449,21 @@ export async function createTemplate(
 ): Promise<Template> {
   console.log('🆕 createTemplate called with:', templateData);
   
-  // Get the current user to ensure RLS policy works
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError) {
-    console.error('❌ Auth error in createTemplate:', authError);
-    throw new Error('Authentication error: ' + authError.message);
-  }
+  // Get the current user and refresh session if needed to ensure RLS policy works
+  console.log('🔐 Getting user session for create...');
+  let { data: { user }, error: authError } = await supabase.auth.getUser();
   
-  if (!user) {
-    console.error('❌ No user found in createTemplate');
-    throw new Error('User not authenticated');
+  if (authError || !user) {
+    console.log('🔄 Attempting to refresh session in createTemplate...');
+    const { data: { session }, error: refreshError } = await supabase.auth.refreshSession();
+    
+    if (refreshError || !session?.user) {
+      console.error('❌ Session refresh failed:', refreshError);
+      throw new Error('Session expired. Please log in again.');
+    }
+    
+    user = session.user;
+    console.log('✅ Session refreshed successfully for create');
   }
 
   console.log('✅ User authenticated for create:', { userId: user.id, email: user.email });
@@ -474,16 +479,26 @@ export async function createTemplate(
   const { data, error } = await supabase
     .from('templates')
     .insert(templateDataWithUserId)
-    .select()
-    .single();
+    .select();
 
   if (error) {
-    console.error('❌ Create template error:', error);
+    console.error('❌ Create template error details:', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+      payload: templateDataWithUserId
+    });
     throw error;
   }
 
-  console.log('✅ Template created successfully:', data);
-  return data;
+  const result = data && Array.isArray(data) ? data[0] : data;
+  if (!result) {
+    throw new Error('Template created but no data returned');
+  }
+
+  console.log('✅ Template created successfully:', result);
+  return result;
 }
 
 /**
@@ -569,19 +584,30 @@ export async function updateTemplate(
         .from('templates')
         .update(cleanUpdates)
         .eq('id', templateId)
-        .eq('user_id', user.id) // Ensure RLS policy is satisfied
-        .select()
-        .single(),
+        .eq('user_id', user.id)
+        .select(),
       timeoutPromise
     ]);
 
     if (error) {
-      console.error('❌ Update error:', error);
+      console.error('❌ Update template error details:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        templateId,
+        updates: cleanUpdates
+      });
       throw error;
     }
 
-    console.log('✅ Template updated successfully:', data);
-    return data;
+    const result = data && Array.isArray(data) ? data[0] : data;
+    if (!result) {
+      throw new Error('Template updated but no data returned');
+    }
+
+    console.log('✅ Template updated successfully:', result);
+    return result;
   } catch (error) {
     console.error('❌ updateTemplate error:', error);
     throw error;

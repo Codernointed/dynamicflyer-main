@@ -285,106 +285,120 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="space-y-8">
-      {/* Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="space-y-10 pb-12 p-8 md:p-12">
+      {/* Dashboard Top Header */}
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between border-b border-slate-100 pb-8">
         <div>
+          <div className="flex items-center gap-2 text-amber-600 mb-2">
+            <LayoutList className="h-4 w-4" />
+            <span className="text-[10px] font-bold uppercase tracking-widest">Workspace</span>
+          </div>
           <motion.h1 
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 15 }}
             animate={{ opacity: 1, y: 0 }}
-            className="text-3xl font-bold text-gray-900"
+            className="text-4xl font-black text-slate-900 tracking-tight"
           >
-            <span className="bg-gradient-to-r from-amber-400 to-yellow-500 bg-clip-text text-transparent">
-              Dashboard
-            </span>
+            My <span className="bg-gradient-to-r from-amber-500 to-yellow-600 bg-clip-text text-transparent">Templates</span>
           </motion.h1>
-          <p className="text-gray-600">Manage your templates and designs</p>
+          <p className="mt-2 text-slate-500 font-medium">Create, manage and distribute your modular designs.</p>
         </div>
         
         <motion.div 
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          className="flex items-center gap-3"
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="flex items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-100"
         >
-          <Button
-            onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-            variant="outline"
-            size="sm"
-          >
-            {viewMode === 'grid' ? <LayoutList className="h-4 w-4" /> : <Grid3X3 className="h-4 w-4" />}
-          </Button>
+          <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl">
+            <Button
+              onClick={() => setViewMode('grid')}
+              variant={viewMode === 'grid' ? 'white' : 'ghost'}
+              size="sm"
+              className={`h-9 px-3 rounded-lg ${viewMode === 'grid' ? 'shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <Grid3X3 className="h-4 w-4" />
+            </Button>
+            <Button
+              onClick={() => setViewMode('list')}
+              variant={viewMode === 'list' ? 'white' : 'ghost'}
+              size="sm"
+              className={`h-9 px-3 rounded-lg ${viewMode === 'list' ? 'shadow-sm text-slate-900' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+              <LayoutList className="h-4 w-4" />
+            </Button>
+          </div>
           
           <Button 
             onClick={handleCreateTemplate}
-            className="bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white border-0"
+            className="h-11 px-6 bg-slate-900 hover:bg-slate-800 text-white border-0 shadow-lg shadow-slate-200 rounded-xl transition-all hover:scale-[1.02] active:scale-[0.98]"
           >
-            <Plus className="mr-2 h-4 w-4" />
-            New Template
+            <Plus className="mr-2 h-5 w-5 text-amber-400" />
+            <span className="font-bold">New Template</span>
           </Button>
         </motion.div>
       </div>
 
-      {/* Filters */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-        className="flex flex-col gap-4 sm:flex-row sm:items-center"
-      >
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <Input
-            placeholder="Search templates..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+      {/* Filters & Discovery Section */}
+      <div className="space-y-6 bg-slate-50/50 p-6 rounded-[2rem] border border-slate-100">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center">
+          <div className="relative flex-1 group">
+            <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 group-focus-within:text-amber-500 transition-colors" />
+            <Input
+              placeholder="Search by name, description or tags..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-12 pl-11 bg-white border-slate-200 rounded-2xl focus-visible:ring-amber-500/20 focus-visible:border-amber-500 shadow-sm transition-all"
+            />
+          </div>
+          
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+              <SelectTrigger className="h-12 w-full sm:w-[220px] bg-white border-slate-200 rounded-2xl font-medium focus:ring-amber-500/20">
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-slate-400" />
+                  <SelectValue placeholder="Category" />
+                </div>
+              </SelectTrigger>
+              <SelectContent className="rounded-xl border-slate-100">
+                <SelectItem value="all">All Designs</SelectItem>
+                <SelectItem value="flyers">Marketing Flyers</SelectItem>
+                <SelectItem value="certificates">Academic Certificates</SelectItem>
+                <SelectItem value="brochures">Corporate Brochures</SelectItem>
+                <SelectItem value="business-cards">Business Cards</SelectItem>
+                <SelectItem value="invitations">Event Invitations</SelectItem>
+                <SelectItem value="social">Social Assets</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button variant="outline" className="h-12 rounded-2xl px-5 border-slate-200 bg-white hover:bg-slate-50 text-slate-600 font-medium">
+              Sort By: Recent
+            </Button>
+          </div>
         </div>
         
-        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-          <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="Category" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Templates</SelectItem>
-            <SelectItem value="flyers">Flyers</SelectItem>
-            <SelectItem value="certificates">Certificates</SelectItem>
-            <SelectItem value="brochures">Brochures</SelectItem>
-            <SelectItem value="business-cards">Business Cards</SelectItem>
-            <SelectItem value="invitations">Invitations</SelectItem>
-            <SelectItem value="social">Social Media</SelectItem>
-          </SelectContent>
-        </Select>
-      </motion.div>
+        {/* Popular Exploration */}
+        {popularTags.length > 0 && (
+          <div className="flex items-center gap-3 overflow-x-auto pb-1 no-scrollbar">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest whitespace-nowrap">Trending:</span>
+            {popularTags.slice(0, 10).map((tag) => (
+              <Badge
+                key={tag.tag}
+                variant="secondary"
+                className={`cursor-pointer px-3 py-1.5 rounded-full text-xs transition-all whitespace-nowrap border ${
+                  searchQuery === tag.tag 
+                    ? 'bg-amber-100 text-amber-700 border-amber-200 shadow-sm shadow-amber-100' 
+                    : 'bg-white text-slate-600 border-slate-100 hover:border-amber-200 hover:text-amber-600'
+                }`}
+                onClick={() => setSearchQuery(tag.tag === searchQuery ? '' : tag.tag)}
+              >
+                #{tag.tag}
+              </Badge>
+            ))}
+          </div>
+        )}
+      </div>
 
-      {/* Popular Tags */}
-      {popularTags.length > 0 && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="flex flex-wrap items-center gap-2"
-        >
-          <span className="text-sm font-medium text-gray-700">Popular:</span>
-          {popularTags.slice(0, 8).map((tag) => (
-            <Badge
-              key={tag.tag}
-              variant="secondary"
-              className="cursor-pointer hover:bg-amber-100 hover:text-amber-700"
-              onClick={() => setSearchQuery(tag.tag)}
-            >
-              {tag.tag}
-            </Badge>
-          ))}
-        </motion.div>
-      )}
-
-      {/* Templates Grid */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-      >
+      {/* Main Grid Section */}
+      <div className="min-h-[400px]">
         <TemplateGrid
           templates={filteredTemplates}
           loading={loading}
@@ -394,18 +408,19 @@ export default function Dashboard() {
           onDeleteTemplate={handleDeleteTemplate}
           onDuplicateTemplate={handleDuplicateTemplate}
         />
-      </motion.div>
+      </div>
 
-      {/* Stats */}
+      {/* Persistence Info & Count */}
       {!loading && templates.length > 0 && (
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="text-center text-sm text-gray-500"
-        >
-          Showing {filteredTemplates.length} of {templates.length} templates
-        </motion.div>
+        <div className="flex items-center justify-between pt-10 border-t border-slate-100">
+          <div className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+            {filteredTemplates.length} matches found
+          </div>
+          <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Auto-Sync Active
+          </div>
+        </div>
       )}
     </div>
   );

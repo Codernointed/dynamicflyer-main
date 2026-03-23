@@ -135,6 +135,16 @@ const App = () => {
               <Route path="/auth/check-email" element={<CheckEmailPage />} />
               <Route path="/auth/confirm" element={<ConfirmEmailPage />} />
 
+              {/* Standalone Editor Route for full-screen experience - Matches before DashboardLayout */}
+              <Route 
+                path="/dashboard/editor/:templateId" 
+                element={
+                  <ProtectedRoute>
+                    <TemplateEditor />
+                  </ProtectedRoute>
+                }
+              />
+
               {/* Protected Dashboard Routes */}
               <Route 
                 path="/dashboard" 
@@ -145,7 +155,6 @@ const App = () => {
                 }
               >
                 <Route index element={<Dashboard />} />
-                <Route path="editor/:templateId" element={<TemplateEditor />} />
                 <Route path="analytics" element={<Analytics />} />
                 <Route path="fonts" element={<FontManager />} />
                 <Route path="downloads" element={<DownloadLimitManager />} />

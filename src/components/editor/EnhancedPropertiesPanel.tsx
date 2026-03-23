@@ -20,7 +20,13 @@ import {
   Copy,
   RotateCw,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  AlignStartVertical,
+  AlignCenterVertical,
+  AlignEndVertical
 } from 'lucide-react';
 
 // Custom RoundedSquare icon component
@@ -55,6 +61,7 @@ const Hexagon = ({ className, ...props }: any) => (
   </svg>
 );
 import { FrameData } from './EnhancedCanvasEditor';
+import SearchableFontPicker from './SearchableFontPicker';
 
 interface EnhancedPropertiesPanelProps {
   frame: FrameData;
@@ -475,26 +482,14 @@ export default function EnhancedPropertiesPanel({
             </div>
 
               <div className="space-y-2">
-              <Label className="text-xs text-gray-500">Font Family</Label>
-                <Select
-                value={localFrame.properties?.fontFamily || 'Arial'}
-                onValueChange={(value) => updateFrame({
-                  properties: { ...localFrame.properties, fontFamily: value }
-                })}
-                >
-                <SelectTrigger className="h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="max-h-60">
-                  {FONT_FAMILIES.map((font) => (
-                      <SelectItem key={font.value} value={font.value}>
-                        <span style={{ fontFamily: font.style.split(':')[1].split(';')[0].trim() }}>
-                          {font.label}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label className="text-xs text-gray-500">Font Family</Label>
+                <SearchableFontPicker
+                  fonts={FONT_FAMILIES}
+                  value={localFrame.properties?.fontFamily || 'Arial'}
+                  onValueChange={(value) => updateFrame({
+                    properties: { ...localFrame.properties, fontFamily: value }
+                  })}
+                />
               </div>
 
               <div className="space-y-2">
@@ -540,15 +535,37 @@ export default function EnhancedPropertiesPanel({
               </div>
 
               <div className="space-y-2">
-              <Label className="text-xs text-gray-500">Text Color</Label>
+                <Label className="text-xs text-gray-500">Text Color</Label>
+                <div className="flex items-center gap-2">
                   <Input
                     type="color"
-                value={localFrame.properties?.color || '#000000'}
-                onChange={(e) => updateFrame({
-                  properties: { ...localFrame.properties, color: e.target.value }
-                })}
-                className="h-8 w-full"
+                    value={localFrame.properties?.color || '#000000'}
+                    onChange={(e) => updateFrame({
+                      properties: { ...localFrame.properties, color: e.target.value }
+                    })}
+                    className="h-8 w-12 p-1"
                   />
+                  <Input
+                    type="text"
+                    value={localFrame.properties?.color || '#000000'}
+                    onChange={(e) => updateFrame({
+                      properties: { ...localFrame.properties, color: e.target.value }
+                    })}
+                    className="h-8 flex-1"
+                  />
+                </div>
+                <div className="grid grid-cols-6 gap-1 mt-2">
+                  {['#000000', '#ffffff', '#f87171', '#fbbf24', '#34d399', '#60a5fa', '#818cf8', '#a78bfa', '#f472b6', '#9ca3af', '#4b5563', '#1f2937'].map((color) => (
+                    <button
+                      key={color}
+                      className={`h-6 w-full rounded border border-gray-200 transition-transform active:scale-95 ${localFrame.properties?.color === color ? 'ring-2 ring-primary ring-offset-1' : ''}`}
+                      style={{ backgroundColor: color }}
+                      onClick={() => updateFrame({
+                        properties: { ...localFrame.properties, color: color }
+                      })}
+                    />
+                  ))}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -570,53 +587,118 @@ export default function EnhancedPropertiesPanel({
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+              </div>
           </CardContent>
         </Card>
-        )}
+      )}
 
-      {/* Quick Actions */}
+      {/* Quick Actions & Alignment */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
+          <CardTitle className="text-sm font-medium">Quick Actions & Alignment</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => updateFrame({ x: 0, y: 0 })}
-            className="w-full"
-          >
-            Move to Top-Left
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => updateFrame({ rotation: 0 })}
-            className="w-full"
-          >
-            Reset Rotation
-          </Button>
-          {frame.type === 'text' && (
+        <CardContent className="space-y-4">
+          {/* Horizontal Alignment */}
+          <div className="space-y-2">
+            <Label className="text-[10px] text-gray-400 uppercase tracking-wider">Horizontal Alignment</Label>
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8"
+                onClick={() => updateFrame({ x: 0 })}
+                title="Align Left"
+              >
+                <AlignLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8"
+                onClick={() => updateFrame({ x: 1200 / 2 - localFrame.width / 2 })}
+                title="Align Center"
+              >
+                <AlignCenter className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8"
+                onClick={() => updateFrame({ x: 1200 - localFrame.width })}
+                title="Align Right"
+              >
+                <AlignRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Vertical Alignment */}
+          <div className="space-y-2">
+            <Label className="text-[10px] text-gray-400 uppercase tracking-wider">Vertical Alignment</Label>
+            <div className="flex gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8"
+                onClick={() => updateFrame({ y: 0 })}
+                title="Align Top"
+              >
+                <AlignStartVertical className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8"
+                onClick={() => updateFrame({ y: 800 / 2 - localFrame.height / 2 })}
+                title="Align Middle"
+              >
+                <AlignCenterVertical className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex-1 h-8"
+                onClick={() => updateFrame({ y: 800 - localFrame.height })}
+                title="Align Bottom"
+              >
+                <AlignEndVertical className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <Separator className="my-2" />
+
+          <div className="grid grid-cols-2 gap-2">
             <Button
               variant="outline"
               size="sm"
-              onClick={() => updateFrame({
-                properties: {
-                  ...localFrame.properties,
-                  fontSize: 24,
-                  fontFamily: 'Arial',
-                  color: '#000000',
-                  textAlign: 'center'
-                }
-              })}
-              className="w-full"
+              onClick={() => updateFrame({ rotation: 0 })}
+              className="h-8 text-xs"
             >
-              Reset Text Style
+              <RotateCw className="h-3.5 w-3.5 mr-1.5" />
+              Reset Rotation
             </Button>
-        )}
-      </CardContent>
-    </Card>
+            {frame.type === 'text' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => updateFrame({
+                  properties: {
+                    ...localFrame.properties,
+                    fontSize: 24,
+                    fontFamily: 'Arial',
+                    color: '#000000',
+                    textAlign: 'center'
+                  }
+                })}
+                className="h-8 text-xs"
+              >
+                Reset Style
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
-} 
+}
